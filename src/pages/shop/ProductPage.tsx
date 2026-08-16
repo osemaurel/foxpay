@@ -69,13 +69,9 @@ export default function ProductPage() {
           <Cover product={product} />
 
           <div className="min-w-0">
-            {/* Le cadre : nom, prix, bouton. Rien d'autre. */}
+            {/* Le cadre : le prix et le bouton, rien d'autre. */}
             <section className="rounded-2xl border border-line bg-card p-6 text-center sm:p-8 lg:text-left">
-              <h1 className="text-2xl font-medium leading-tight text-ink sm:text-3xl">
-                {product.title}
-              </h1>
-
-              <div ref={priceRef} className="mt-4">
+              <div ref={priceRef}>
                 <PriceTag product={product} />
               </div>
 
@@ -88,15 +84,15 @@ export default function ProductPage() {
                   <BuyButton product={product} onClick={openForm} className="w-full" />
                 )}
               </div>
-
-              <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-ink-faint">
-                Paiement mobile money · Livraison immédiate
-              </p>
             </section>
 
-            {/* Hors du cadre : la description, puis le détail de la livraison. */}
+            {/* Hors du cadre : le nom, puis la description. */}
+            <h1 className="mt-8 text-2xl font-medium leading-tight text-ink sm:text-3xl">
+              {product.title}
+            </h1>
+
             {product.description && (
-              <RichContent value={product.description} className="mt-8 text-ink-muted" />
+              <RichContent value={product.description} className="mt-4 text-ink-muted" />
             )}
 
             <Included product={product} />
