@@ -38,6 +38,20 @@ export type Product = {
   updated_at: string
 }
 
+export type Review = {
+  id: string
+  product_id: string
+  author_name: string
+  /** Ville, métier, entreprise : ce qui rend le témoignage situable. */
+  author_detail: string | null
+  rating: number | null
+  body: string
+  position: number
+  is_visible: boolean
+  created_at: string
+  updated_at: string
+}
+
 export type OrderStatus = 'pending' | 'paid' | 'failed' | 'cancelled'
 
 export type Order = {

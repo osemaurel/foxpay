@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { callFunction } from '../../lib/supabase'
-import type { Product, Shop } from '../../lib/types'
-import { formatFileSize, formatPrice } from '../../lib/format'
+import { callFunction, supabase } from '../../lib/supabase'
+import type { Product, Review, Shop } from '../../lib/types'
+import { formatPrice } from '../../lib/format'
 import { Alert, Eyebrow, Field, inputClass } from '../../components/ui'
 import RichContent from '../../components/RichContent'
 import { useShop } from './ShopLayout'
@@ -94,10 +94,10 @@ export default function ProductPage() {
             {product.description && (
               <RichContent value={product.description} className="mt-4 text-ink-muted" />
             )}
-
-            <Included product={product} />
           </div>
         </div>
+
+        <Reviews productId={product.id} />
       </main>
 
       {/* Barre d'achat mobile, une fois le prix sorti de l'écran. */}
@@ -232,37 +232,82 @@ function StickyBar({
   )
 }
 
-function Included({ product }: { product: Product }) {
-  const items = [
-    {
-      label: 'Le fichier',
-      value: product.file_name ?? 'Fichier numérique',
-      note: formatFileSize(product.file_size) || 'Téléchargeable immédiatement',
-    },
-    {
-      label: 'Livraison',
-      value: 'Par email',
-      note: 'Le lien part dès que le paiement est confirmé.',
-    },
-    {
-      label: 'Ton accès',
-      value: '24 h · 3 téléchargements',
-      note: 'De quoi enregistrer le fichier sur ton téléphone et ton ordinateur.',
-    },
-  ]
+/**
+ * Avis clients. Ce sont des témoignages recueillis et saisis par le vendeur :
+ * l'affichage ne prétend donc jamais qu'ils sont vérifiés par la plateforme, et
+ * la section disparaît entièrement s'il n'y en a aucun.
+ */
+function Reviews({ productId }: { productId: string }) {
+  const [reviews, setReviews] = useState<Review[] | null>(null)
+
+  useEffect(() => {
+    supabase
+      .from('reviews')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_visible', true)
+      .order('position')
+      .order('created_at')
+      .then(({ data }) => setReviews(data ?? []))
+  }, [productId])
+
+  if (!reviews || reviews.length === 0) return null
 
   return (
-    <section className="mt-8 grid gap-3 sm:grid-cols-3">
-      {items.map((item) => (
-        <div key={item.label} className="rounded-xl border border-line bg-raise p-4">
-          <Eyebrow>{item.label}</Eyebrow>
-          <p className="mt-2 truncate text-sm font-medium text-ink" title={item.value}>
-            {item.value}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-ink-faint">{item.note}</p>
-        </div>
-      ))}
+    <section className="mt-16 border-t border-line-soft pt-12 sm:mt-24">
+      <header className="mx-auto max-w-2xl text-center">
+        <Eyebrow>Avis clients</Eyebrow>
+        <h2 className="mt-3 text-2xl font-medium leading-tight text-ink sm:text-3xl">
+          Ce qu'en disent celles et ceux qui l'ont acheté
+        </h2>
+      </header>
+
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {reviews.map((review) => (
+          <figure
+            key={review.id}
+            className="flex flex-col rounded-2xl border border-line bg-raise p-6"
+          >
+            {review.rating !== null && <Stars rating={review.rating} />}
+
+            <blockquote className="mt-4 flex-1 leading-relaxed text-ink">
+              {review.body}
+            </blockquote>
+
+            <figcaption className="mt-5 border-t border-line-soft pt-4">
+              <p className="text-sm font-medium text-ink">{review.author_name}</p>
+              {review.author_detail && (
+                <p className="text-xs text-ink-faint">{review.author_detail}</p>
+              )}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
     </section>
+  )
+}
+
+function Stars({ rating }: { rating: number }) {
+  return (
+    <div
+      className="flex gap-0.5"
+      role="img"
+      aria-label={`${rating} sur 5`}
+      style={{ color: 'var(--accent)' }}
+    >
+      {[1, 2, 3, 4, 5].map((n) => (
+        <svg key={n} width="15" height="15" viewBox="0 0 24 24" aria-hidden>
+          <path
+            d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.1 6.45L12 17.77l-5.8 3.05 1.1-6.45-4.7-4.58 6.5-.95z"
+            fill={n <= rating ? 'currentColor' : 'transparent'}
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+            opacity={n <= rating ? 1 : 0.3}
+          />
+        </svg>
+      ))}
+    </div>
   )
 }
 

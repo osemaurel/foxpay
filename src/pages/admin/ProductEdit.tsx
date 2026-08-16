@@ -14,6 +14,7 @@ import {
   ImagePicker,
   inputClass,
 } from '../../components/ui'
+import ReviewsEditor from './ReviewsEditor'
 import { useAdmin } from './AdminLayout'
 
 // L'éditeur ne concerne que le vendeur : il ne doit pas alourdir le bundle
@@ -294,6 +295,16 @@ export default function ProductEdit() {
           />
         </Field>
       </Card>
+
+      {existing ? (
+        <ReviewsEditor productId={existing.id} />
+      ) : (
+        <Card title="Avis clients">
+          <p className="text-sm text-ink-faint">
+            Enregistre d'abord le produit, puis tu pourras ajouter des avis.
+          </p>
+        </Card>
+      )}
 
       <Card title="Bouton d'achat">
         <p className="mb-4 text-sm text-ink-muted">

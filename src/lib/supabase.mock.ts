@@ -6,7 +6,7 @@
  * ce qu'on regarde dans la preview est exactement ce qui tourne en production,
  * avec des données en dur à la place du réseau.
  */
-import type { Order, Product, Shop } from './types'
+import type { Order, Product, Review, Shop } from './types'
 
 /** La preview n'a rien à configurer. */
 export const missingEnv: string[] = []
@@ -146,12 +146,43 @@ const orders: Order[] = [
   updated_at: daysAgo(days as number),
 }))
 
+const AVIS: [number, string, string, number, string][] = [
+  [0, 'Aminata Koné', 'Coiffeuse, Abidjan', 5,
+   "J'ai suivi le guide un dimanche après-midi. Le mardi j'avais vendu mon premier pack de conseils. Ce qui m'a débloquée, c'est la partie sur le prix : je me bradais depuis deux ans."],
+  [0, 'Serge Bamba', 'Photographe, Bouaké', 5,
+   "Clair, sans blabla. Les modèles de messages de relance valent à eux seuls le prix. J'ai récupéré trois clients qui ne répondaient plus."],
+  [0, 'Fatou Diallo', 'Graphiste, Yamoussoukro', 4,
+   "Très bon contenu. J'aurais aimé plus d'exemples sur les prestations récurrentes, mais tout le reste est directement applicable."],
+  [0, 'Kouamé Yao', 'Consultant, Abidjan', 5,
+   "Je bricolais avec WhatsApp et des captures d'écran de virements. Maintenant tout est automatique et je dors mieux."],
+  [0, 'Awa Cissé', 'Pâtissière, Daloa', 5,
+   "Le passage sur le mobile money m'a fait gagner un mois d'essais. Merci."],
+  [1, 'Moussa Traoré', 'Menuisier, Korhogo', 5,
+   "Les factures sont propres et je n'ai plus honte de les envoyer. Ça change l'image que les clients ont de mon travail."],
+  [1, 'Jean-Baptiste Kouassi', 'Électricien, San-Pédro', 4,
+   'Pratique. Il a fallu que je change deux ou trois choses pour mon activité, mais la base est solide.'],
+]
+
+const reviews: Review[] = AVIS.map(([produit, nom, detail, note, texte], i) => ({
+  id: `review-${i}`,
+  product_id: `product-${produit}`,
+  author_name: nom,
+  author_detail: detail,
+  rating: note,
+  body: texte,
+  position: i,
+  is_visible: true,
+  created_at: daysAgo(30 - i),
+  updated_at: daysAgo(30 - i),
+}))
+
 type Row = Record<string, unknown>
 
 const TABLES: Record<string, Row[]> = {
   shops: [shop] as unknown as Row[],
   products: products as unknown as Row[],
   orders: orders as unknown as Row[],
+  reviews: reviews as unknown as Row[],
 }
 
 /**
@@ -171,6 +202,8 @@ function builder(table: Row[], rows: Row[], pending: Row | null = null) {
     limit: (n: number) => builder(table, rows.slice(0, n), pending),
     eq: (column: string, value: unknown) =>
       builder(table, rows.filter((row) => row[column] === value), pending),
+    in: (column: string, values: unknown[]) =>
+      builder(table, rows.filter((row) => values.includes(row[column])), pending),
     insert: (values: Row) => {
       const created = { ...values, id: `nouveau-${table.length}`, created_at: new Date().toISOString() }
       table.push(created)
