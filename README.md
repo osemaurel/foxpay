@@ -4,15 +4,15 @@ Boutique standalone pour vendre **un** produit digital : page publique, paiement
 mobile money, livraison automatique par lien de téléchargement à durée limitée.
 
 Stack : React + TypeScript + Tailwind, Supabase (auth / Postgres / Storage / Edge Functions),
-paiement Moneroo (ou MoneyFusion).
+paiement mobile money via **pawaPay**, email de livraison via **Resend**.
 
 ## État
 
 - [x] Étape 1 — Schéma de base de données (`supabase/migrations/0001_init.sql`)
 - [ ] Étape 2 — App React (auth + admin boutique/produit)
 - [ ] Étape 3 — Page publique `/boutique/:slug`
-- [ ] Étape 4 — Paiement : Edge Functions `create-payment` + `payment-webhook`
-- [ ] Étape 5 — Livraison : `download` (URL signée) + email
+- [ ] Étape 4 — Paiement : Edge Functions `create-payment` + `pawapay-callback`
+- [ ] Étape 5 — Livraison : `download` (URL signée) + email Resend
 - [ ] Étape 6 — Suivi des ventes (admin)
 
 ## Modèle de données
@@ -51,9 +51,14 @@ policy de lecture (le vendeur voit ses ventes). La création et la mise à jour
 passent par les Edge Functions en `service_role`, qui contournent RLS. Un
 acheteur ne peut donc pas se déclarer payé.
 
-**Webhook idempotent.** Index unique sur `(provider, provider_reference)` : si le
-PSP rejoue la notification, la commande n'est pas dupliquée et l'email de
-livraison n'est pas renvoyé.
+**`deposit_id` est généré par nous.** pawaPay attend un UUIDv4 fourni par le
+marchand, ce qui donne une clé de réconciliation qui existe même si la réponse
+HTTP se perd en route. Index unique dessus → si pawaPay rejoue son callback (il
+le fait), la commande n'est pas dupliquée et l'email n'est pas renvoyé deux fois.
+
+**`country` en ISO 3166-1 alpha-3.** pawaPay en a besoin pour router vers les
+bons opérateurs mobile money. Stocké sur `shops` (modifiable dans l'admin) et
+recopié sur la commande.
 
 **Droit de téléchargement porté par la commande.** `download_token` (uuid,
 unique) + `download_expires_at` (posé à `now() + 24h` à la confirmation) +

@@ -29,11 +29,15 @@ create table public.shops (
   banner_url    text,
   accent_color  text not null default '#2563eb',
   contact_email text,                       -- expéditeur / réponse acheteur
+  -- Pays d'opération, ISO 3166-1 alpha-3. pawaPay l'exige pour router le
+  -- paiement vers les bons opérateurs mobile money.
+  country       text not null default 'CIV',
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
 
   constraint shops_slug_format check (slug ~ '^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$'),
-  constraint shops_accent_color_format check (accent_color ~* '^#[0-9a-f]{6}$')
+  constraint shops_accent_color_format check (accent_color ~* '^#[0-9a-f]{6}$'),
+  constraint shops_country_format check (country ~ '^[A-Z]{3}$')
 );
 
 create trigger shops_set_updated_at
@@ -80,13 +84,18 @@ create table public.orders (
   amount                  integer not null check (amount >= 0),
   currency                text not null default 'XOF',
 
-  -- paiement
+  -- paiement (pawaPay)
   status                  text not null default 'pending'
                             check (status in ('pending', 'paid', 'failed', 'cancelled')),
-  provider                text not null default 'moneroo'
-                            check (provider in ('moneroo', 'moneyfusion')),
-  provider_reference      text,                       -- id de transaction côté PSP
-  checkout_url            text,
+  provider                text not null default 'pawapay'
+                            check (provider in ('pawapay')),
+  -- deposit_id est généré par NOUS (UUIDv4) et envoyé à pawaPay : c'est la clé
+  -- de réconciliation, elle existe même si la réponse HTTP se perd.
+  deposit_id              uuid not null default gen_random_uuid(),
+  country                 text not null,              -- copié de shops.country
+  provider_transaction_id text,                       -- id côté opérateur mobile money
+  failure_reason          text,                       -- rempli si status = 'failed'
+  checkout_url            text,                       -- redirectUrl de la Payment Page
   paid_at                 timestamptz,
 
   -- livraison
@@ -104,10 +113,9 @@ create trigger orders_set_updated_at
   before update on public.orders
   for each row execute function public.set_updated_at();
 
--- Idempotence du webhook : une référence PSP ne peut être traitée qu'une fois.
-create unique index orders_provider_reference_key
-  on public.orders (provider, provider_reference)
-  where provider_reference is not null;
+-- Idempotence du webhook : pawaPay rejoue ses callbacks, et deposit_id est
+-- l'identifiant stable de la transaction. Une commande = un deposit_id.
+create unique index orders_deposit_id_key on public.orders (deposit_id);
 
 create unique index orders_download_token_key on public.orders (download_token);
 create index orders_shop_created_idx on public.orders (shop_id, created_at desc);
