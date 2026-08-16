@@ -6,10 +6,10 @@ import { Card, Spinner } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
 const STATUS: Record<Order['status'], { text: string; className: string }> = {
-  paid: { text: 'Payé', className: 'bg-emerald-100 text-emerald-800' },
-  pending: { text: 'En attente', className: 'bg-amber-100 text-amber-800' },
-  failed: { text: 'Échoué', className: 'bg-red-100 text-red-800' },
-  cancelled: { text: 'Annulé', className: 'bg-slate-100 text-slate-600' },
+  paid: { text: 'Payé', className: 'bg-go/15 text-go' },
+  pending: { text: 'En attente', className: 'bg-wait/15 text-wait' },
+  failed: { text: 'Échoué', className: 'bg-stop/15 text-stop' },
+  cancelled: { text: 'Annulé', className: 'bg-white/5 text-chalk-muted' },
 }
 
 const FILTERS = [
@@ -47,18 +47,18 @@ export default function SalesPage() {
       <Card title="Résumé">
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
           <div>
-            <p className="text-2xl font-semibold tabular-nums text-slate-900">
+            <p className="text-2xl font-semibold tabular-nums text-chalk">
               {formatPrice(total)}
             </p>
-            <p className="text-sm text-slate-500">Total encaissé</p>
+            <p className="text-sm text-chalk-faint">Total encaissé</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold tabular-nums text-slate-900">{paid.length}</p>
-            <p className="text-sm text-slate-500">{paid.length > 1 ? 'ventes' : 'vente'}</p>
+            <p className="text-2xl font-semibold tabular-nums text-chalk">{paid.length}</p>
+            <p className="text-sm text-chalk-faint">{paid.length > 1 ? 'ventes' : 'vente'}</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold tabular-nums text-slate-900">{orders.length}</p>
-            <p className="text-sm text-slate-500">tentatives au total</p>
+            <p className="text-2xl font-semibold tabular-nums text-chalk">{orders.length}</p>
+            <p className="text-sm text-chalk-faint">tentatives au total</p>
           </div>
         </div>
       </Card>
@@ -73,8 +73,8 @@ export default function SalesPage() {
                 className={
                   'rounded-full px-3 py-1 text-sm transition ' +
                   (filter === f.id
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900')
+                    ? 'bg-white text-black'
+                    : 'text-chalk-faint hover:bg-white/5 hover:text-chalk')
                 }
               >
                 {f.label}
@@ -85,7 +85,7 @@ export default function SalesPage() {
         </div>
 
         {shown.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-chalk-faint">
             {orders.length === 0
               ? "Aucune commande pour l'instant. Elles apparaîtront ici dès le premier achat."
               : 'Aucune commande dans cette catégorie.'}
@@ -93,7 +93,7 @@ export default function SalesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 text-slate-500">
+              <thead className="border-b border-line text-chalk-faint">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Date</th>
                   <th className="py-2 pr-4 font-medium">Acheteur</th>
@@ -104,14 +104,14 @@ export default function SalesPage() {
               </thead>
               <tbody>
                 {shown.map((order) => (
-                  <tr key={order.id} className="border-b border-slate-100 last:border-0">
-                    <td className="whitespace-nowrap py-2 pr-4 text-slate-500">
+                  <tr key={order.id} className="border-b border-line-soft last:border-0">
+                    <td className="whitespace-nowrap py-2 pr-4 text-chalk-faint">
                       {formatDate(order.created_at)}
                     </td>
-                    <td className="py-2 pr-4 text-slate-900">
+                    <td className="py-2 pr-4 text-chalk">
                       {order.buyer_email}
                       {order.buyer_name && (
-                        <span className="block text-xs text-slate-500">{order.buyer_name}</span>
+                        <span className="block text-xs text-chalk-faint">{order.buyer_name}</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap py-2 pr-4 tabular-nums">
@@ -124,7 +124,7 @@ export default function SalesPage() {
                         {STATUS[order.status].text}
                       </span>
                     </td>
-                    <td className="py-2 tabular-nums text-slate-500">
+                    <td className="py-2 tabular-nums text-chalk-faint">
                       {order.status === 'paid'
                         ? `${order.download_count}/${order.max_downloads}`
                         : '—'}
@@ -169,7 +169,7 @@ function ExportButton({ orders, slug }: { orders: Order[]; slug: string }) {
   return (
     <button
       onClick={download}
-      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+      className="rounded-lg border border-line px-3 py-1.5 text-sm text-chalk-muted hover:bg-ink"
     >
       Exporter en CSV
     </button>

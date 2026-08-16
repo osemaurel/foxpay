@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { callFunction, supabase } from '../lib/supabase'
 import type { Product, Shop as ShopType } from '../lib/types'
-import { formatPrice } from '../lib/format'
-import { Alert, Button, Field, inputClass, Spinner } from '../components/ui'
+import { formatFileSize, formatPrice } from '../lib/format'
+import { Alert, Button, Eyebrow, Field, inputClass, Spinner } from '../components/ui'
 
 export default function Shop() {
   const { slug } = useParams<{ slug: string }>()
@@ -38,58 +38,185 @@ export default function Shop() {
 
   if (!shop) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-        <p className="text-slate-500">Cette boutique n'existe pas.</p>
+      <div className="flex min-h-screen items-center justify-center bg-ink p-6">
+        <p className="text-chalk-muted">Cette boutique n'existe pas.</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {shop.banner_url && (
-        <img src={shop.banner_url} alt="" className="h-40 w-full object-cover sm:h-56" />
-      )}
+    <div
+      className="min-h-screen bg-ink"
+      style={{ '--accent': shop.accent_color } as React.CSSProperties}
+    >
+      <Hero shop={shop} />
 
-      <div className="mx-auto max-w-2xl px-4 py-8">
-        <header className="mb-8 flex items-center gap-4">
-          {shop.logo_url && (
-            <img
-              src={shop.logo_url}
-              alt=""
-              className="h-16 w-16 shrink-0 rounded-full border border-slate-200 bg-white object-contain"
-            />
-          )}
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{shop.name}</h1>
-            {shop.description && (
-              <p className="mt-1 whitespace-pre-line text-slate-600">{shop.description}</p>
-            )}
-          </div>
-        </header>
-
+      <main className="mx-auto max-w-4xl px-5 pb-24">
         {product ? (
-          <ProductCard shop={shop} product={product} />
+          <>
+            <ProductBlock shop={shop} product={product} />
+            <Included product={product} />
+          </>
         ) : (
-          <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-500">
-            Aucun produit en vente pour le moment.
-          </p>
+          <div className="rounded-2xl border border-line bg-ink-card p-12 text-center">
+            <p className="text-chalk-muted">Aucun produit en vente pour le moment.</p>
+          </div>
         )}
+      </main>
 
-        {shop.contact_email && (
-          <p className="mt-8 text-center text-sm text-slate-400">
-            Une question ?{' '}
-            <a href={`mailto:${shop.contact_email}`} className="underline">
+      <footer className="border-t border-line-soft">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-8">
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-chalk-faint">
+            {shop.name}
+          </p>
+          {shop.contact_email && (
+            <a
+              href={`mailto:${shop.contact_email}`}
+              className="text-sm text-chalk-faint underline-offset-4 hover:text-chalk hover:underline"
+            >
               {shop.contact_email}
             </a>
-          </p>
-        )}
-      </div>
+          )}
+        </div>
+      </footer>
     </div>
   )
 }
 
-function ProductCard({ shop, product }: { shop: ShopType; product: Product }) {
+/**
+ * La bannière sert de matière, pas d'illustration : elle est fondue dans le
+ * noir pour que le titre reste lisible quelle que soit l'image envoyée.
+ */
+function Hero({ shop }: { shop: ShopType }) {
+  return (
+    <header className="relative overflow-hidden border-b border-line-soft">
+      {shop.banner_url && (
+        <div className="absolute inset-0">
+          <img src={shop.banner_url} alt="" className="h-full w-full object-cover opacity-40" />
+          <div className="absolute inset-0 bg-gradient-to-b from-ink/50 via-ink/85 to-ink" />
+        </div>
+      )}
+
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 left-1/2 h-96 w-[42rem] -translate-x-1/2 opacity-25 blur-3xl"
+        style={{
+          background: 'radial-gradient(closest-side, var(--accent), transparent)',
+        }}
+      />
+
+      <div className="relative mx-auto max-w-4xl px-5 pb-16 pt-20 sm:pb-24 sm:pt-28">
+        {shop.logo_url && (
+          <img
+            src={shop.logo_url}
+            alt=""
+            className="mb-8 h-16 w-16 rounded-2xl border border-line bg-ink-card object-contain p-1.5"
+          />
+        )}
+
+        <h1 className="max-w-2xl text-4xl font-medium leading-[1.05] text-chalk sm:text-6xl">
+          {shop.name}
+        </h1>
+
+        {shop.description && (
+          <p className="mt-6 max-w-xl whitespace-pre-line text-lg leading-relaxed text-chalk-muted">
+            {shop.description}
+          </p>
+        )}
+      </div>
+    </header>
+  )
+}
+
+function ProductBlock({ shop, product }: { shop: ShopType; product: Product }) {
   const [open, setOpen] = useState(false)
+
+  return (
+    <article className="-mt-8 overflow-hidden rounded-2xl border border-line bg-ink-card sm:-mt-12">
+      {product.cover_url && (
+        <img
+          src={product.cover_url}
+          alt=""
+          className="aspect-[16/9] w-full border-b border-line-soft object-cover"
+        />
+      )}
+
+      <div className="p-6 sm:p-10">
+        <Eyebrow>Produit numérique</Eyebrow>
+
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+          <h2 className="max-w-xl text-2xl font-medium leading-tight text-chalk sm:text-4xl">
+            {product.title}
+          </h2>
+          <p
+            className="text-3xl font-medium tabular-nums sm:text-4xl"
+            style={{ color: 'var(--accent)' }}
+          >
+            {formatPrice(product.price, product.currency)}
+          </p>
+        </div>
+
+        {product.description && (
+          <p className="mt-6 max-w-2xl whitespace-pre-line leading-relaxed text-chalk-muted">
+            {product.description}
+          </p>
+        )}
+
+        <div className="mt-8">
+          {open ? (
+            <BuyForm shop={shop} product={product} />
+          ) : (
+            <>
+              <Button accent onClick={() => setOpen(true)} className="w-full sm:w-auto">
+                Acheter — {formatPrice(product.price, product.currency)}
+              </Button>
+              <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-chalk-faint">
+                Paiement mobile money · Livraison immédiate
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+/** Ce que l'acheteur obtient concrètement, en trois cartes. */
+function Included({ product }: { product: Product }) {
+  const items = [
+    {
+      label: 'Le fichier',
+      value: product.file_name ?? 'Fichier numérique',
+      note: formatFileSize(product.file_size) || 'Téléchargeable immédiatement',
+    },
+    {
+      label: 'Livraison',
+      value: 'Par email',
+      note: "Le lien part dès que le paiement est confirmé, sans intervention de notre part.",
+    },
+    {
+      label: 'Ton accès',
+      value: '24 h · 3 téléchargements',
+      note: 'Largement de quoi enregistrer le fichier sur ton téléphone et ton ordinateur.',
+    },
+  ]
+
+  return (
+    <section className="mt-6 grid gap-4 sm:grid-cols-3">
+      {items.map((item) => (
+        <div key={item.label} className="rounded-2xl border border-line bg-ink-raised p-6">
+          <Eyebrow>{item.label}</Eyebrow>
+          <p className="mt-3 truncate font-medium text-chalk" title={item.value}>
+            {item.value}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-chalk-faint">{item.note}</p>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function BuyForm({ shop, product }: { shop: ShopType; product: Product }) {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -116,76 +243,48 @@ function ProductCard({ shop, product }: { shop: ShopType; product: Product }) {
   }
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      {product.cover_url && (
-        <img src={product.cover_url} alt="" className="aspect-video w-full object-cover" />
-      )}
+    <form
+      onSubmit={buy}
+      className="space-y-5 rounded-2xl border border-line bg-ink-raised p-6 sm:p-8"
+    >
+      <Eyebrow>Finaliser l'achat</Eyebrow>
 
-      <div className="p-6">
-        <h2 className="text-xl font-semibold text-slate-900">{product.title}</h2>
-        {product.description && (
-          <p className="mt-2 whitespace-pre-line text-slate-600">{product.description}</p>
-        )}
+      <Field label="Ton email" hint="C'est là que le lien de téléchargement sera envoyé.">
+        <input
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className={inputClass}
+        />
+      </Field>
 
-        <p className="mt-4 text-2xl font-bold" style={{ color: shop.accent_color }}>
-          {formatPrice(product.price, product.currency)}
-        </p>
-
-        {!open ? (
-          <Button
-            onClick={() => setOpen(true)}
-            accent={shop.accent_color}
-            className="mt-6 w-full"
-          >
-            Acheter
-          </Button>
-        ) : (
-          <form onSubmit={buy} className="mt-6 space-y-4">
-            <Field label="Ton email" hint="C'est là que le lien de téléchargement sera envoyé.">
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Ton nom (facultatif)">
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-            <Field
-              label="Numéro mobile money (facultatif)"
-              hint="Indicatif compris, ex. 2250700000000. Pré-remplit la page de paiement."
-            >
-              <input
-                inputMode="numeric"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                className={inputClass}
-              />
-            </Field>
-
-            {error && <Alert kind="error">{error}</Alert>}
-
-            <Button
-              type="submit"
-              disabled={busy}
-              accent={shop.accent_color}
-              className="w-full"
-            >
-              {busy ? 'Redirection…' : `Payer ${formatPrice(product.price, product.currency)}`}
-            </Button>
-          </form>
-        )}
-
-        <p className="mt-4 text-center text-xs text-slate-400">
-          Paiement mobile money sécurisé · Livraison immédiate par email
-        </p>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Ton nom (facultatif)">
+          <input
+            value={name}
+            autoComplete="name"
+            onChange={(e) => setName(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Numéro mobile money (facultatif)" hint="Indicatif compris, ex. 2250700000000.">
+          <input
+            inputMode="numeric"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+            className={inputClass}
+          />
+        </Field>
       </div>
-    </article>
+
+      {error && <Alert kind="error">{error}</Alert>}
+
+      <Button type="submit" accent disabled={busy} className="w-full">
+        {busy ? 'Redirection…' : `Payer ${formatPrice(product.price, product.currency)}`}
+      </Button>
+    </form>
   )
 }

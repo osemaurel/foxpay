@@ -10,6 +10,8 @@ import Home from './pages/admin/Home'
 import ProductPage from './pages/admin/ProductPage'
 import SalesPage from './pages/admin/SalesPage'
 import SettingsPage from './pages/admin/SettingsPage'
+import '@fontsource-variable/inter'
+import '@fontsource-variable/geist-mono'
 import './index.css'
 
 const session = { user: { id: 'user-1', email: 'moi@atelierkodi.ci' } } as unknown as Session

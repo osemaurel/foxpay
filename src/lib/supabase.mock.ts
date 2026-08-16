@@ -14,15 +14,15 @@ export const missingEnv: string[] = []
 const svg = (markup: string) => `data:image/svg+xml,${encodeURIComponent(markup)}`
 
 const LOGO = svg(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" rx="48" fill="#1c1917"/><text x="48" y="63" font-family="Georgia,serif" font-size="44" fill="#fb923c" text-anchor="middle">K</text></svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" rx="24" fill="#121212"/><rect x="0.5" y="0.5" width="95" height="95" rx="23.5" fill="none" stroke="#ffffff" stroke-opacity="0.1"/><text x="48" y="62" font-family="Inter,system-ui,sans-serif" font-weight="500" font-size="40" fill="#bf854a" text-anchor="middle">K</text></svg>`,
 )
 
 const BANNER = svg(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c2d12"/><stop offset="0.55" stop-color="#c2410c"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs><rect width="1200" height="320" fill="url(#g)"/><circle cx="980" cy="60" r="180" fill="#fff" opacity="0.08"/><circle cx="1120" cy="280" r="120" fill="#fff" opacity="0.06"/></svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320"><defs><radialGradient id="a" cx="0.3" cy="0" r="0.9"><stop offset="0" stop-color="#bf854a" stop-opacity="0.55"/><stop offset="1" stop-color="#000000" stop-opacity="0"/></radialGradient></defs><rect width="1200" height="320" fill="#000000"/><rect width="1200" height="320" fill="url(#a)"/></svg>`,
 )
 
 const COVER = svg(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"><rect width="800" height="450" fill="#1c1917"/><circle cx="640" cy="90" r="200" fill="#c2410c" opacity="0.35"/><circle cx="180" cy="390" r="160" fill="#f59e0b" opacity="0.25"/><text x="60" y="200" font-family="Georgia,serif" font-size="52" fill="#fafaf9">Vendre en ligne</text><text x="60" y="262" font-family="Georgia,serif" font-size="52" fill="#fb923c">en Côte d'Ivoire</text><text x="62" y="320" font-family="system-ui,sans-serif" font-size="20" fill="#a8a29e" letter-spacing="3">GUIDE COMPLET · 84 PAGES</text></svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"><defs><radialGradient id="c" cx="0.75" cy="0.15" r="0.8"><stop offset="0" stop-color="#bf854a" stop-opacity="0.45"/><stop offset="1" stop-color="#050505" stop-opacity="0"/></radialGradient></defs><rect width="800" height="450" fill="#050505"/><rect width="800" height="450" fill="url(#c)"/><text x="64" y="212" font-family="Inter,system-ui,sans-serif" font-weight="500" font-size="46" letter-spacing="-1.5" fill="#ffffff">Vendre en ligne</text><text x="64" y="268" font-family="Inter,system-ui,sans-serif" font-weight="500" font-size="46" letter-spacing="-1.5" fill="#fee5bb">en C\u00f4te d'Ivoire</text><text x="66" y="330" font-family="ui-monospace,monospace" font-size="17" fill="#ffffff" fill-opacity="0.45" letter-spacing="3">GUIDE COMPLET \u00b7 84 PAGES</text></svg>`,
 )
 
 const now = new Date()
@@ -37,7 +37,7 @@ const shop: Shop = {
     "J'accompagne les indépendants d'Abidjan qui veulent vendre leurs services en ligne sans y passer leurs nuits.\n\nPaiement mobile money, livraison du fichier dans la minute.",
   logo_url: LOGO,
   banner_url: BANNER,
-  accent_color: '#c2410c',
+  accent_color: '#bf854a',
   contact_email: 'bonjour@atelierkodi.ci',
   country: 'CIV',
   created_at: daysAgo(60),

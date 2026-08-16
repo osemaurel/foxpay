@@ -47,15 +47,15 @@ export default function Home() {
                 <span
                   className={
                     'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ' +
-                    (step.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500')
+                    (step.done ? 'bg-go/15 text-go' : 'bg-white/10 text-chalk-faint')
                   }
                 >
                   {step.done ? '✓' : '·'}
                 </span>
                 {step.done ? (
-                  <span className="text-slate-500 line-through">{step.label}</span>
+                  <span className="text-chalk-faint line-through">{step.label}</span>
                 ) : (
-                  <Link to={step.to} className="text-slate-900 underline underline-offset-2">
+                  <Link to={step.to} className="text-chalk underline underline-offset-2">
                     {step.label}
                   </Link>
                 )}
@@ -73,7 +73,7 @@ export default function Home() {
         </div>
         <Link
           to="/admin/ventes"
-          className="mt-6 inline-block text-sm text-slate-500 underline underline-offset-2 hover:text-slate-900"
+          className="mt-6 inline-block text-sm text-chalk-faint underline underline-offset-2 hover:text-chalk"
         >
           Voir le détail des ventes
         </Link>
@@ -85,8 +85,8 @@ export default function Home() {
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <p className="text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
-      <p className="text-sm text-slate-500">{label}</p>
+      <p className="text-2xl font-semibold tabular-nums text-chalk">{value}</p>
+      <p className="text-sm text-chalk-faint">{label}</p>
     </div>
   )
 }
@@ -107,18 +107,18 @@ function ShopLink({ slug, live }: { slug: string; live: boolean }) {
 
   return (
     <Card title="Ta boutique">
-      <p className="mb-3 text-sm text-slate-600">
+      <p className="mb-3 text-sm text-chalk-muted">
         {live
           ? "C'est l'adresse à partager. Elle est en ligne et prête à encaisser."
           : "Cette adresse est déjà en ligne, mais elle n'affichera aucun produit tant que la mise en vente n'est pas terminée."}
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-lg bg-slate-100 px-3 py-2 font-mono text-sm text-slate-800">
+        <code className="min-w-0 flex-1 truncate rounded-lg bg-white/5 px-3 py-2 font-mono text-sm text-chalk">
           {url}
         </code>
         <button
           onClick={copy}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-line px-3 py-2 text-sm text-chalk-muted hover:bg-ink"
         >
           {copied ? 'Copié' : 'Copier'}
         </button>
@@ -126,7 +126,7 @@ function ShopLink({ slug, live }: { slug: string; live: boolean }) {
           href={`/boutique/${slug}`}
           target="_blank"
           rel="noreferrer"
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-line px-3 py-2 text-sm text-chalk-muted hover:bg-ink"
         >
           Ouvrir
         </a>

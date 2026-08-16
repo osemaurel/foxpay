@@ -145,18 +145,18 @@ export default function ProductPage() {
       </Card>
 
       <Card title="Le fichier livré">
-        <p className="mb-4 text-sm text-slate-600">
+        <p className="mb-4 text-sm text-chalk-muted">
           Stocké en privé. Il n'est jamais accessible sans paiement : l'acheteur reçoit un lien
           signé, valable 24 h et utilisable 3 fois.
         </p>
 
         {form.file_name ? (
-          <p className="mb-3 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-800">
+          <p className="mb-3 rounded-lg bg-white/5 px-3 py-2 text-sm text-chalk">
             {form.file_name}{' '}
-            <span className="text-slate-500">{formatFileSize(form.file_size)}</span>
+            <span className="text-chalk-faint">{formatFileSize(form.file_size)}</span>
           </p>
         ) : (
-          <p className="mb-3 text-sm text-slate-500">Aucun fichier pour l'instant.</p>
+          <p className="mb-3 text-sm text-chalk-faint">Aucun fichier pour l'instant.</p>
         )}
 
         <Field label={form.file_name ? 'Remplacer le fichier' : 'Envoyer le fichier'}>
@@ -183,8 +183,8 @@ export default function ProductPage() {
             className="mt-1 h-4 w-4"
           />
           <span className="text-sm">
-            <span className="font-medium text-slate-900">Afficher le produit sur la boutique</span>
-            <span className="block text-slate-500">
+            <span className="font-medium text-chalk">Afficher le produit sur la boutique</span>
+            <span className="block text-chalk-faint">
               {canPublish
                 ? 'Décoche pour retirer la vente sans supprimer le produit.'
                 : 'Il faut un titre, un prix supérieur à zéro et un fichier avant de pouvoir vendre.'}

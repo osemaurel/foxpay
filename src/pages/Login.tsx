@@ -51,9 +51,9 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-ink p-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-6 text-center text-2xl font-bold text-slate-900">Administration</h1>
+        <h1 className="mb-6 text-center text-2xl font-bold text-chalk">Administration</h1>
         <Card>
           <form onSubmit={submit} className="space-y-4">
             <Field label="Email">
@@ -96,7 +96,7 @@ export default function Login() {
               setError(null)
               setNotice(null)
             }}
-            className="mt-4 w-full text-sm text-slate-500 hover:text-slate-800"
+            className="mt-4 w-full text-sm text-chalk-faint transition hover:text-chalk"
           >
             {mode === 'signin' ? 'Créer un compte' : "J'ai déjà un compte"}
           </button>

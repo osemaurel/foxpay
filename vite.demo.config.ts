@@ -55,6 +55,9 @@ export default defineConfig({
   build: {
     outDir,
     emptyOutDir: true,
+    // Les polices doivent finir en data URI dans le CSS, sinon l'aperçu
+    // en fichier unique les perd et retombe sur la police système.
+    assetsInlineLimit: 10_000_000,
     rollupOptions: { input: resolve(__dirname, 'demo.html') },
   },
 })

@@ -1,1 +1,88 @@
 @import "tailwindcss";
+
+/*
+  Système visuel repris de la référence Projectise : fond noir pur, surfaces
+  légèrement au-dessus, filets blancs très faibles, texte blanc puis blanc
+  atténué, et un seul accent chaud.
+
+  Parti pris assumé : le thème est sombre, point. Pas de bascule clair/sombre —
+  la référence n'en a pas, et une boutique doit avoir un rendu identique pour
+  tous les acheteurs. Chaque couleur est donc posée explicitement.
+
+  L'accent est la seule couleur variable : chaque boutique choisit la sienne
+  dans les paramètres, et elle est injectée à l'exécution via --accent.
+*/
+@theme {
+  --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  /* Fonds, du plus profond au plus haut */
+  --color-ink: #000000;
+  --color-ink-raised: #0a0a0a;
+  --color-ink-card: #121212;
+
+  /* Filets : jamais des gris opaques, toujours du blanc très dilué */
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-soft: rgba(255, 255, 255, 0.04);
+
+  /* Texte */
+  --color-chalk: #ffffff;
+  --color-chalk-muted: rgba(255, 255, 255, 0.62);
+  --color-chalk-faint: rgba(255, 255, 255, 0.4);
+
+  /* Accent par défaut : le bronze de la référence */
+  --color-gold: #bf854a;
+  --color-gold-soft: #fee5bb;
+
+  /* Statuts, distincts de l'accent */
+  --color-go: #0cc202;
+  --color-wait: #d9a441;
+  --color-stop: #e5484d;
+}
+
+html {
+  background-color: var(--color-ink);
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-chalk);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+  Les titres de la référence sont serrés et compacts : sans ce resserrement,
+  Inter en grande taille paraît lâche et le rendu perd son côté « premium ».
+*/
+h1,
+h2,
+h3 {
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* Accent injecté par la page boutique ; valeur de repli pour l'admin. */
+:root {
+  --accent: var(--color-gold);
+}
+
+::selection {
+  background: var(--accent);
+  color: #000;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

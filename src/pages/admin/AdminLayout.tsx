@@ -76,7 +76,7 @@ export default function AdminLayout({ session }: { session: Session }) {
 
   return (
     <Shell email={session.user.email} shop={shop}>
-      <nav className="border-b border-slate-200 bg-white">
+      <nav className="border-b border-line bg-ink-raised">
         <div className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-4">
           {TABS.map((tab) => (
             <NavLink
@@ -86,8 +86,8 @@ export default function AdminLayout({ session }: { session: Session }) {
               className={({ isActive }) =>
                 'whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition ' +
                 (isActive
-                  ? 'border-slate-900 text-slate-900'
-                  : 'border-transparent text-slate-500 hover:text-slate-900')
+                  ? 'border-[var(--accent)] text-chalk'
+                  : 'border-transparent text-chalk-faint hover:text-chalk')
               }
             >
               {tab.label}
@@ -113,18 +113,18 @@ function Shell({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-ink">
+      <header className="border-b border-line bg-ink-raised">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
           <div className="min-w-0">
-            <h1 className="truncate font-semibold text-slate-900">
+            <h1 className="truncate font-semibold text-chalk">
               {shop ? shop.name : 'Administration'}
             </h1>
-            {email && <p className="truncate text-xs text-slate-500">{email}</p>}
+            {email && <p className="truncate text-xs text-chalk-faint">{email}</p>}
           </div>
           <button
             onClick={() => supabase.auth.signOut()}
-            className="shrink-0 text-sm text-slate-500 hover:text-slate-900"
+            className="shrink-0 text-sm text-chalk-faint hover:text-chalk"
           >
             Déconnexion
           </button>
@@ -159,7 +159,7 @@ function CreateShop({ ownerId, onCreated }: { ownerId: string; onCreated: () => 
 
   return (
     <Card title="Crée ta boutique">
-      <p className="mb-4 text-sm text-slate-600">
+      <p className="mb-4 text-sm text-chalk-muted">
         Deux informations suffisent pour commencer. Tout le reste se règle ensuite.
       </p>
       <form onSubmit={submit} className="space-y-4">
