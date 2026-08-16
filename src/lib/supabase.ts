@@ -18,9 +18,13 @@ export const missingEnv: string[] = [
   anonKey ? null : 'VITE_SUPABASE_ANON_KEY',
 ].filter((name): name is string => name !== null)
 
+// `||` et non `??` : une variable déclarée sans valeur arrive ici en chaîne
+// vide, que `??` laisserait passer. createClient('') lève « supabaseUrl is
+// required » au chargement du module, donc avant que React puisse afficher
+// quoi que ce soit — c'est exactement la page blanche qu'on cherche à éviter.
 export const supabase = createClient(
-  url ?? 'https://absent.supabase.co',
-  anonKey ?? 'absent',
+  url || 'https://absent.supabase.co',
+  anonKey || 'absent',
 )
 
 /** Appelle une Edge Function et remonte le message d'erreur du serveur. */
