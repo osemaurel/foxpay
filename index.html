@@ -4,9 +4,76 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Boutique</title>
+    <style>
+      #boot {
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        max-width: 40rem;
+        margin: 15vh auto;
+        padding: 0 1.5rem;
+        color: #0f172a;
+        line-height: 1.6;
+      }
+      #boot h1 { font-size: 1.125rem; margin: 0 0 0.75rem; }
+      #boot pre {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        overflow-x: auto;
+        font-size: 0.8125rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #boot .muted { color: #64748b; font-size: 0.875rem; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      Ce bloc est remplacé par React dès qu'il monte. S'il reste visible, c'est
+      que le JavaScript n'a pas démarré — et on préfère le dire plutôt que de
+      servir une page blanche dont la seule explication est dans la console.
+    -->
+    <div id="root">
+      <div id="boot"><p class="muted">Chargement…</p></div>
+    </div>
+
+    <script>
+      (function () {
+        function report(title, detail) {
+          var boot = document.getElementById('boot')
+          if (!boot) return
+          boot.innerHTML =
+            '<h1></h1><pre></pre><p class="muted">Cette page est servie correctement : ' +
+            "l'erreur vient du script de l'application.</p>"
+          boot.querySelector('h1').textContent = title
+          boot.querySelector('pre').textContent = detail
+        }
+
+        window.addEventListener('error', function (event) {
+          report(
+            'Le script a échoué au démarrage',
+            (event.message || 'Erreur inconnue') +
+              (event.filename ? '\n\n' + event.filename + ':' + event.lineno : ''),
+          )
+        })
+
+        window.addEventListener('unhandledrejection', function (event) {
+          report('Erreur non interceptée', String(event.reason))
+        })
+
+        // Si React n'a pas remplacé le bloc au bout de 8 s, le bundle n'a pas
+        // été chargé du tout : mauvais chemin d'asset, 404, ou blocage réseau.
+        setTimeout(function () {
+          if (document.getElementById('boot')) {
+            report(
+              "L'application ne s'est pas lancée",
+              "Le fichier JavaScript n'a pas été exécuté. Vérifie dans l'onglet " +
+                'Réseau que /assets/index-*.js répond bien en 200 et non en 404.',
+            )
+          }
+        }, 8000)
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
