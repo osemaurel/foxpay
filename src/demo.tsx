@@ -5,6 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import ShopLayout from './pages/shop/ShopLayout'
 import ShopHome from './pages/shop/ShopHome'
 import ShopProductPage from './pages/shop/ProductPage'
+import ShopCheckout from './pages/shop/Checkout'
 import Login from './pages/Login'
 import Return from './pages/Return'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -30,6 +31,7 @@ const SCREENS = [
           <Route path="/boutique/:slug" element={<ShopLayout />}>
             <Route index element={<ShopHome />} />
             <Route path="p/:productSlug" element={<ShopProductPage />} />
+            <Route path="checkout/:productSlug" element={<ShopCheckout />} />
           </Route>
         </Routes>
       </MemoryRouter>

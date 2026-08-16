@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { callFunction, supabase } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import type { Product, Review, Shop } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
-import { Alert, Eyebrow, Field, inputClass } from '../../components/ui'
+import { Eyebrow } from '../../components/ui'
 import RichContent from '../../components/RichContent'
 import { useShop } from './ShopLayout'
 
@@ -12,8 +12,6 @@ export default function ProductPage() {
   const { shop, products } = useShop()
   const product = products.find((p) => p.slug === productSlug)
 
-  const [open, setOpen] = useState(false)
-  const formRef = useRef<HTMLDivElement>(null)
   const priceRef = useRef<HTMLDivElement>(null)
   const [priceOffScreen, setPriceOffScreen] = useState(false)
 
@@ -47,14 +45,6 @@ export default function ProductPage() {
     )
   }
 
-  function openForm() {
-    setOpen(true)
-    // Laisse le formulaire se monter avant de le viser.
-    requestAnimationFrame(() =>
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-    )
-  }
-
   return (
     <>
       <main className="mx-auto max-w-5xl px-5 py-6 pb-28 sm:py-10 lg:pb-16">
@@ -76,13 +66,7 @@ export default function ProductPage() {
               </div>
 
               <div className="mt-6">
-                {open ? (
-                  <div ref={formRef}>
-                    <BuyForm shop={shop} product={product} />
-                  </div>
-                ) : (
-                  <BuyButton product={product} onClick={openForm} className="w-full" />
-                )}
+                <BuyLink shop={shop} product={product} className="w-full" />
               </div>
             </section>
 
@@ -101,11 +85,7 @@ export default function ProductPage() {
       </main>
 
       {/* Barre d'achat mobile, une fois le prix sorti de l'écran. */}
-      <StickyBar
-        product={product}
-        visible={priceOffScreen && !open}
-        onBuy={openForm}
-      />
+      <StickyBar shop={shop} product={product} visible={priceOffScreen} />
     </>
   )
 }
@@ -144,9 +124,7 @@ function PriceTag({ product, compact }: { product: Product; compact?: boolean })
       }
     >
       <span
-        className={
-          'font-medium tabular-nums ' + (compact ? 'text-xl' : 'text-3xl sm:text-4xl')
-        }
+        className={'font-medium tabular-nums ' + (compact ? 'text-xl' : 'text-3xl sm:text-4xl')}
         style={{ color: buttonColor(product) }}
       >
         {formatPrice(product.price, product.currency)}
@@ -176,19 +154,23 @@ function buttonColor(product: Product): string {
   return product.cta_color ?? 'var(--accent)'
 }
 
-function BuyButton({
+/**
+ * Le bouton d'achat est un lien vers la page de paiement, pas un formulaire
+ * ouvert sur place : ça donne une adresse à laquelle revenir, ouvrable dans un
+ * nouvel onglet, et sépare nettement « je regarde » de « j'achète ».
+ */
+function BuyLink({
+  shop,
   product,
-  onClick,
   className = '',
 }: {
+  shop: Shop
   product: Product
-  onClick: () => void
   className?: string
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <Link
+      to={`/boutique/${shop.slug}/checkout/${product.slug}`}
       style={{ backgroundColor: buttonColor(product) }}
       className={
         'inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium ' +
@@ -197,7 +179,7 @@ function BuyButton({
       }
     >
       {product.cta_label?.trim() || 'Acheter'}
-    </button>
+    </Link>
   )
 }
 
@@ -206,13 +188,13 @@ function BuyButton({
  * visible en permanence, une barre y serait du bruit.
  */
 function StickyBar({
+  shop,
   product,
   visible,
-  onBuy,
 }: {
+  shop: Shop
   product: Product
   visible: boolean
-  onBuy: () => void
 }) {
   return (
     <div
@@ -226,7 +208,7 @@ function StickyBar({
     >
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3">
         <PriceTag product={product} compact />
-        <BuyButton product={product} onClick={onBuy} className="shrink-0" />
+        <BuyLink shop={shop} product={product} className="shrink-0" />
       </div>
     </div>
   )
@@ -308,81 +290,5 @@ function Stars({ rating }: { rating: number }) {
         </svg>
       ))}
     </div>
-  )
-}
-
-function BuyForm({ shop, product }: { shop: Shop; product: Product }) {
-  const [email, setEmail] = useState('')
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function buy(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      const { redirectUrl } = await callFunction<{ redirectUrl: string }>('create-payment', {
-        slug: shop.slug,
-        product_slug: product.slug,
-        buyer_email: email,
-        buyer_name: name || null,
-        buyer_phone: phone || null,
-      })
-      // On quitte le site vers la page de paiement pawaPay.
-      window.location.href = redirectUrl
-    } catch (e) {
-      setError((e as Error).message)
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={buy} className="space-y-4 text-left">
-      <Field label="Ton email" hint="C'est là que le lien de téléchargement sera envoyé.">
-        <input
-          type="email"
-          required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={inputClass}
-        />
-      </Field>
-
-      <Field label="Ton nom (facultatif)">
-        <input
-          value={name}
-          autoComplete="name"
-          onChange={(e) => setName(e.target.value)}
-          className={inputClass}
-        />
-      </Field>
-
-      <Field
-        label="Numéro mobile money (facultatif)"
-        hint="Indicatif compris, ex. 2250700000000."
-      >
-        <input
-          inputMode="numeric"
-          autoComplete="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-          className={inputClass}
-        />
-      </Field>
-
-      {error && <Alert kind="error">{error}</Alert>}
-
-      <button
-        type="submit"
-        disabled={busy}
-        style={{ backgroundColor: buttonColor(product) }}
-        className="inline-flex w-full items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-40"
-      >
-        {busy ? 'Redirection…' : `Payer ${formatPrice(product.price, product.currency)}`}
-      </button>
-    </form>
   )
 }

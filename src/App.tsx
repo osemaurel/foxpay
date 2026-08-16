@@ -9,6 +9,7 @@ import Return from './pages/Return'
 import ShopLayout from './pages/shop/ShopLayout'
 import ShopHome from './pages/shop/ShopHome'
 import ProductPage from './pages/shop/ProductPage'
+import Checkout from './pages/shop/Checkout'
 import AdminLayout from './pages/admin/AdminLayout'
 import Home from './pages/admin/Home'
 import ProductsList from './pages/admin/ProductsList'
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/boutique/:slug" element={<ShopLayout />}>
           <Route index element={<ShopHome />} />
           <Route path="p/:productSlug" element={<ProductPage />} />
+          <Route path="checkout/:productSlug" element={<Checkout />} />
         </Route>
         <Route path="/boutique/:slug/retour" element={<Return />} />
 
