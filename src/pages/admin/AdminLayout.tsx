@@ -1,0 +1,192 @@
+import { useCallback, useEffect, useState } from 'react'
+import { NavLink, Outlet, useOutletContext } from 'react-router-dom'
+import type { Session } from '@supabase/supabase-js'
+import { supabase } from '../../lib/supabase'
+import { slugify } from '../../lib/slug'
+import type { Product, Shop } from '../../lib/types'
+import { Alert, Button, Card, Field, inputClass, Spinner } from '../../components/ui'
+
+export type AdminContext = {
+  shop: Shop
+  product: Product | null
+  onShopSaved: (shop: Shop) => void
+  onProductSaved: (product: Product) => void
+}
+
+/** Accès au contexte depuis les pages enfants. */
+export function useAdmin() {
+  return useOutletContext<AdminContext>()
+}
+
+const TABS = [
+  { to: '/admin', label: 'Accueil', end: true },
+  { to: '/admin/produit', label: 'Produit', end: false },
+  { to: '/admin/ventes', label: 'Ventes', end: false },
+  { to: '/admin/parametres', label: 'Paramètres', end: false },
+]
+
+export default function AdminLayout({ session }: { session: Session }) {
+  const [shop, setShop] = useState<Shop | null>(null)
+  const [product, setProduct] = useState<Product | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    const { data: shopRow } = await supabase
+      .from('shops')
+      .select('*')
+      .eq('owner_id', session.user.id)
+      .maybeSingle()
+
+    setShop(shopRow)
+
+    if (shopRow) {
+      const { data: productRow } = await supabase
+        .from('products')
+        .select('*')
+        .eq('shop_id', shopRow.id)
+        .maybeSingle()
+      setProduct(productRow)
+    }
+    setLoading(false)
+  }, [session.user.id])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  if (loading) return <Spinner />
+
+  // Tant que la boutique n'existe pas, il n'y a rien à naviguer.
+  if (!shop) {
+    return (
+      <Shell email={session.user.email}>
+        <main className="mx-auto max-w-3xl p-4 py-8">
+          <CreateShop ownerId={session.user.id} onCreated={load} />
+        </main>
+      </Shell>
+    )
+  }
+
+  const context: AdminContext = {
+    shop,
+    product,
+    onShopSaved: setShop,
+    onProductSaved: setProduct,
+  }
+
+  return (
+    <Shell email={session.user.email} shop={shop}>
+      <nav className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-4">
+          {TABS.map((tab) => (
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              end={tab.end}
+              className={({ isActive }) =>
+                'whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition ' +
+                (isActive
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-900')
+              }
+            >
+              {tab.label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
+      <main className="mx-auto max-w-3xl space-y-6 p-4 py-8">
+        <Outlet context={context} />
+      </main>
+    </Shell>
+  )
+}
+
+function Shell({
+  email,
+  shop,
+  children,
+}: {
+  email?: string
+  shop?: Shop
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
+          <div className="min-w-0">
+            <h1 className="truncate font-semibold text-slate-900">
+              {shop ? shop.name : 'Administration'}
+            </h1>
+            {email && <p className="truncate text-xs text-slate-500">{email}</p>}
+          </div>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="shrink-0 text-sm text-slate-500 hover:text-slate-900"
+          >
+            Déconnexion
+          </button>
+        </div>
+      </header>
+      {children}
+    </div>
+  )
+}
+
+/** Première visite : on crée la boutique avec le strict minimum. */
+function CreateShop({ ownerId, onCreated }: { ownerId: string; onCreated: () => void }) {
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    const { error } = await supabase.from('shops').insert({ owner_id: ownerId, name, slug })
+    if (error) {
+      setError(
+        error.code === '23505' ? 'Ce lien est déjà pris, choisis-en un autre.' : error.message,
+      )
+      setBusy(false)
+    } else {
+      onCreated()
+    }
+  }
+
+  return (
+    <Card title="Crée ta boutique">
+      <p className="mb-4 text-sm text-slate-600">
+        Deux informations suffisent pour commencer. Tout le reste se règle ensuite.
+      </p>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Nom de la boutique">
+          <input
+            required
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              setSlug(slugify(e.target.value))
+            }}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Lien public" hint={`Ta boutique sera sur /boutique/${slug || '…'}`}>
+          <input
+            required
+            value={slug}
+            onChange={(e) => setSlug(slugify(e.target.value))}
+            className={inputClass}
+          />
+        </Field>
+        {error && <Alert kind="error">{error}</Alert>}
+        <Button type="submit" disabled={busy}>
+          {busy ? '…' : 'Créer'}
+        </Button>
+      </form>
+    </Card>
+  )
+}

@@ -3,9 +3,13 @@ import ReactDOM from 'react-dom/client'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import Shop from './pages/Shop'
-import Admin from './pages/Admin'
 import Login from './pages/Login'
 import Return from './pages/Return'
+import AdminLayout from './pages/admin/AdminLayout'
+import Home from './pages/admin/Home'
+import ProductPage from './pages/admin/ProductPage'
+import SalesPage from './pages/admin/SalesPage'
+import SettingsPage from './pages/admin/SettingsPage'
 import './index.css'
 
 const session = { user: { id: 'user-1', email: 'moi@atelierkodi.ci' } } as unknown as Session
@@ -26,8 +30,19 @@ const SCREENS = [
   {
     id: 'admin',
     label: 'Administration',
-    note: 'Ton écran. Les champs sont modifiables et le rendu suit — change la couleur d’accent puis reviens sur la page boutique.',
-    render: () => <Admin session={session} />,
+    note: 'Quatre onglets, navigables ici même. Les champs sont modifiables : change la couleur d’accent dans Paramètres, enregistre, puis reviens sur la page boutique.',
+    render: () => (
+      <MemoryRouter initialEntries={['/admin']}>
+        <Routes>
+          <Route path="/admin" element={<AdminLayout session={session} />}>
+            <Route index element={<Home />} />
+            <Route path="produit" element={<ProductPage />} />
+            <Route path="ventes" element={<SalesPage />} />
+            <Route path="parametres" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    ),
   },
   {
     id: 'return',

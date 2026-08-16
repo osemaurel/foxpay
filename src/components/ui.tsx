@@ -51,6 +51,47 @@ export function Button({
   )
 }
 
+export const fileInputClass =
+  'w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 ' +
+  'file:bg-slate-100 file:px-3 file:py-2 file:text-sm hover:file:bg-slate-200'
+
+export function ImagePicker({
+  label,
+  hint,
+  url,
+  onPick,
+  disabled,
+}: {
+  label: string
+  hint?: string
+  url: string | null
+  onPick: (file: File) => void
+  disabled?: boolean
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      {url && (
+        <img
+          src={url}
+          alt=""
+          className="mb-2 h-24 w-full rounded-lg border border-slate-200 object-contain p-1"
+        />
+      )}
+      <input
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        disabled={disabled}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onPick(file)
+          e.target.value = ''
+        }}
+        className={fileInputClass}
+      />
+    </Field>
+  )
+}
+
 export function Alert({ kind, children }: { kind: 'error' | 'ok'; children: ReactNode }) {
   const styles =
     kind === 'error'

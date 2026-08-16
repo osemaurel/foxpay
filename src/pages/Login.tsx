@@ -2,6 +2,20 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { Alert, Button, Card, Field, inputClass } from '../components/ui'
 
+/** Les messages de Supabase Auth sont en anglais : on traduit les plus courants. */
+function translate(message: string): string {
+  const m = message.toLowerCase()
+  if (m.includes('invalid login credentials')) return 'Email ou mot de passe incorrect.'
+  if (m.includes('email not confirmed'))
+    return "Ce compte existe mais l'email n'a pas encore été confirmé. Ouvre le lien reçu par email, puis reconnecte-toi."
+  if (m.includes('user already registered'))
+    return 'Un compte existe déjà avec cet email. Connecte-toi plutôt.'
+  if (m.includes('password should be')) return 'Le mot de passe doit faire au moins 8 caractères.'
+  if (m.includes('rate limit') || m.includes('too many'))
+    return "Trop de tentatives d'envoi d'email. Attends quelques minutes avant de réessayer."
+  return message
+}
+
 export default function Login() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
@@ -16,13 +30,23 @@ export default function Login() {
     setError(null)
     setNotice(null)
 
-    const { error } =
-      mode === 'signin'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password })
+    if (mode === 'signin') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setError(translate(error.message))
+    } else {
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        setError(translate(error.message))
+      } else if (data.session) {
+        // Confirmation désactivée côté projet : on est connecté directement.
+        setNotice('Compte créé.')
+      } else {
+        setNotice(
+          `Compte créé. Un email de confirmation a été envoyé à ${email} — ouvre le lien qu'il contient, puis reviens te connecter.`,
+        )
+      }
+    }
 
-    if (error) setError(error.message)
-    else if (mode === 'signup') setNotice('Compte créé. Vérifie tes emails si une confirmation est demandée.')
     setBusy(false)
   }
 
@@ -36,16 +60,21 @@ export default function Login() {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
               />
             </Field>
-            <Field label="Mot de passe">
+            <Field
+              label="Mot de passe"
+              hint={mode === 'signup' ? '8 caractères minimum.' : undefined}
+            >
               <input
                 type="password"
                 required
                 minLength={8}
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={inputClass}
@@ -62,7 +91,11 @@ export default function Login() {
 
           <button
             type="button"
-            onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+            onClick={() => {
+              setMode(mode === 'signin' ? 'signup' : 'signin')
+              setError(null)
+              setNotice(null)
+            }}
             className="mt-4 w-full text-sm text-slate-500 hover:text-slate-800"
           >
             {mode === 'signin' ? 'Créer un compte' : "J'ai déjà un compte"}

@@ -5,9 +5,13 @@ import { missingEnv, supabase } from './lib/supabase'
 import { Spinner } from './components/ui'
 import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
-import Admin from './pages/Admin'
 import Shop from './pages/Shop'
 import Return from './pages/Return'
+import AdminLayout from './pages/admin/AdminLayout'
+import Home from './pages/admin/Home'
+import ProductPage from './pages/admin/ProductPage'
+import SalesPage from './pages/admin/SalesPage'
+import SettingsPage from './pages/admin/SettingsPage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -30,14 +34,18 @@ export default function App() {
       <Routes>
         <Route path="/boutique/:slug" element={<Shop />} />
         <Route path="/boutique/:slug/retour" element={<Return />} />
-        <Route
-          path="/login"
-          element={session ? <Navigate to="/admin" replace /> : <Login />}
-        />
+        <Route path="/login" element={session ? <Navigate to="/admin" replace /> : <Login />} />
+
         <Route
           path="/admin"
-          element={session ? <Admin session={session} /> : <Navigate to="/login" replace />}
-        />
+          element={session ? <AdminLayout session={session} /> : <Navigate to="/login" replace />}
+        >
+          <Route index element={<Home />} />
+          <Route path="produit" element={<ProductPage />} />
+          <Route path="ventes" element={<SalesPage />} />
+          <Route path="parametres" element={<SettingsPage />} />
+        </Route>
+
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </BrowserRouter>
