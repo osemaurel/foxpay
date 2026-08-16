@@ -1,60 +1,94 @@
 @import "tailwindcss";
 
 /*
-  Système visuel repris de la référence Projectise : fond noir pur, surfaces
-  légèrement au-dessus, filets blancs très faibles, texte blanc puis blanc
-  atténué, et un seul accent chaud.
+  Système visuel repris de la référence Projectise : surfaces étagées, filets
+  très faibles plutôt que des bordures grises franches, et un seul accent chaud.
 
-  Parti pris assumé : le thème est sombre, point. Pas de bascule clair/sombre —
-  la référence n'en a pas, et une boutique doit avoir un rendu identique pour
-  tous les acheteurs. Chaque couleur est donc posée explicitement.
+  Deux thèmes. Les valeurs vivent dans des variables CSS ordinaires pour pouvoir
+  changer à l'exécution ; `@theme inline` se contente de les exposer à Tailwind,
+  ce qui évite de figer les couleurs dans les utilitaires générés.
 
-  L'accent est la seule couleur variable : chaque boutique choisit la sienne
-  dans les paramètres, et elle est injectée à l'exécution via --accent.
+  Le sombre est le thème par défaut : c'est la direction artistique choisie, et
+  la boutique doit avoir le même rendu pour tous les acheteurs. Le clair
+  s'active explicitement, jamais tout seul.
 */
-@theme {
+:root {
+  /* Pilote les contrôles natifs (scrollbars, sélecteurs de couleur) et rend
+     light-dark() utilisable dans le HTML de démarrage. */
+  color-scheme: dark;
+
+  --canvas: #000000;
+  --raise: #0a0a0a;
+  --card: #121212;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-soft: rgba(255, 255, 255, 0.04);
+  --tint: rgba(255, 255, 255, 0.05);
+  --tint-strong: rgba(255, 255, 255, 0.1);
+  --ink: #ffffff;
+  --ink-muted: rgba(255, 255, 255, 0.62);
+  --ink-faint: rgba(255, 255, 255, 0.4);
+  --shadow: 0 0 0 0 transparent;
+}
+
+/*
+  Le clair n'est pas une inversion mécanique : sur fond blanc, un texte à 62 %
+  d'opacité devient illisible, et les filets doivent être plus marqués pour
+  exister. Chaque valeur est donc réglée pour son fond.
+*/
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --canvas: #f6f6f7;
+  --raise: #ffffff;
+  --card: #ffffff;
+  --line: rgba(9, 9, 11, 0.12);
+  --line-soft: rgba(9, 9, 11, 0.07);
+  --tint: rgba(9, 9, 11, 0.045);
+  --tint-strong: rgba(9, 9, 11, 0.09);
+  --ink: #09090b;
+  --ink-muted: rgba(9, 9, 11, 0.68);
+  --ink-faint: rgba(9, 9, 11, 0.5);
+  --shadow: 0 1px 2px rgba(9, 9, 11, 0.06);
+}
+
+@theme inline {
   --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, monospace;
 
-  /* Fonds, du plus profond au plus haut */
-  --color-ink: #000000;
-  --color-ink-raised: #0a0a0a;
-  --color-ink-card: #121212;
-
-  /* Filets : jamais des gris opaques, toujours du blanc très dilué */
-  --color-line: rgba(255, 255, 255, 0.08);
-  --color-line-soft: rgba(255, 255, 255, 0.04);
-
-  /* Texte */
-  --color-chalk: #ffffff;
-  --color-chalk-muted: rgba(255, 255, 255, 0.62);
-  --color-chalk-faint: rgba(255, 255, 255, 0.4);
+  --color-canvas: var(--canvas);
+  --color-raise: var(--raise);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-tint: var(--tint);
+  --color-tint-strong: var(--tint-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
 
   /* Accent par défaut : le bronze de la référence */
   --color-gold: #bf854a;
-  --color-gold-soft: #fee5bb;
 
   /* Statuts, distincts de l'accent */
-  --color-go: #0cc202;
-  --color-wait: #d9a441;
-  --color-stop: #e5484d;
+  --color-go: #12a150;
+  --color-wait: #b4790f;
+  --color-stop: #d4383d;
 }
 
 html {
-  background-color: var(--color-ink);
-  color-scheme: dark;
+  background-color: var(--canvas);
 }
 
 body {
-  background-color: var(--color-ink);
-  color: var(--color-chalk);
+  background-color: var(--canvas);
+  color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
 /*
-  Les titres de la référence sont serrés et compacts : sans ce resserrement,
-  Inter en grande taille paraît lâche et le rendu perd son côté « premium ».
+  Les titres de la référence sont serrés : sans ce resserrement, Inter en
+  grande taille paraît lâche et le rendu perd son côté « premium ».
 */
 h1,
 h2,
@@ -70,12 +104,74 @@ h3 {
 
 ::selection {
   background: var(--accent);
-  color: #000;
+  color: #fff;
 }
 
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/*
+  Rendu des descriptions riches. Les marges viennent d'ici plutôt que des
+  balises, pour que le HTML enregistré reste minimal.
+*/
+.prose > * + * {
+  margin-top: 0.85em;
+}
+.prose strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+.prose em {
+  font-style: italic;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.35em;
+}
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose li::marker {
+  color: var(--ink-faint);
+}
+.prose li + li {
+  margin-top: 0.3em;
+}
+.prose h2,
+.prose h3 {
+  color: var(--ink);
+  font-weight: 600;
+  margin-top: 1.5em;
+}
+.prose h2 {
+  font-size: 1.2em;
+}
+.prose h3 {
+  font-size: 1.05em;
+}
+.prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose blockquote {
+  border-left: 2px solid var(--line);
+  padding-left: 1em;
+  color: var(--ink-faint);
+}
+
+/* Placeholder de l'éditeur quand le document est vide. */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-faint);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

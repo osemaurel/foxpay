@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
  */
 export function Eyebrow({ children }: { children: ReactNode }) {
   return (
-    <p className="font-mono text-xs uppercase tracking-[0.18em] text-chalk-faint">{children}</p>
+    <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">{children}</p>
   )
 }
 
@@ -20,11 +20,11 @@ export function Card({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-ink-card p-6 sm:p-8">
+    <section className="rounded-2xl border border-line bg-card p-6 sm:p-8">
       {(title || eyebrow) && (
         <header className="mb-6 space-y-2">
           {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-          {title && <h2 className="text-lg font-medium text-chalk">{title}</h2>}
+          {title && <h2 className="text-lg font-medium text-ink">{title}</h2>}
         </header>
       )}
       {children}
@@ -43,22 +43,22 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-chalk">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-ink">{label}</span>
       {children}
-      {hint && <span className="mt-2 block text-xs leading-relaxed text-chalk-faint">{hint}</span>}
+      {hint && <span className="mt-2 block text-xs leading-relaxed text-ink-faint">{hint}</span>}
     </label>
   )
 }
 
 export const inputClass =
-  'w-full rounded-xl border border-line bg-ink-raised px-3.5 py-2.5 text-chalk ' +
-  'placeholder:text-chalk-faint outline-none transition ' +
+  'w-full rounded-xl border border-line bg-raise px-3.5 py-2.5 text-ink ' +
+  'placeholder:text-ink-faint outline-none transition ' +
   'focus:border-[var(--accent)] disabled:opacity-50'
 
 export const fileInputClass =
-  'w-full text-sm text-chalk-muted file:mr-3 file:cursor-pointer file:rounded-lg ' +
-  'file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-sm file:text-chalk ' +
-  'hover:file:bg-white/15'
+  'w-full text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-lg ' +
+  'file:border-0 file:bg-tint-strong file:px-3 file:py-2 file:text-sm file:text-ink ' +
+  'hover:file:bg-tint-strong'
 
 /** `accent` bascule le bouton sur la couleur de la boutique. */
 export function Button({
@@ -77,10 +77,10 @@ export function Button({
 
   const styles =
     variant === 'ghost'
-      ? 'border border-line text-chalk hover:bg-white/5'
+      ? 'border border-line text-ink hover:bg-tint'
       : accent
         ? 'text-black hover:brightness-110'
-        : 'bg-white text-black hover:bg-white/90'
+        : 'bg-ink text-canvas hover:opacity-90'
 
   return (
     <button
@@ -107,7 +107,7 @@ export function Alert({ kind, children }: { kind: 'error' | 'ok'; children: Reac
 
 export function Spinner({ label = 'Chargement…' }: { label?: string }) {
   return (
-    <p className="p-10 text-center font-mono text-xs uppercase tracking-[0.18em] text-chalk-faint">
+    <p className="p-10 text-center font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
       {label}
     </p>
   )
@@ -132,7 +132,7 @@ export function ImagePicker({
         <img
           src={url}
           alt=""
-          className="mb-3 h-24 w-full rounded-xl border border-line bg-ink object-contain p-2"
+          className="mb-3 h-24 w-full rounded-xl border border-line bg-canvas object-contain p-2"
         />
       )}
       <input

@@ -1,6 +1,22 @@
 <!doctype html>
 <html lang="fr">
   <head>
+    <script>
+      // Appliqué avant le rendu : sinon la page clignote en sombre au chargement
+      // pour quelqu'un qui a choisi le clair.
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem('foxpay-theme') === 'light' ? 'light' : 'dark'
+      } catch (e) {
+        document.documentElement.dataset.theme = 'dark'
+      }
+    </script>
+    <style>
+      html { background: #000 }
+      html[data-theme="light"] { background: #f6f6f7 }
+      body { margin: 0 }
+    </style>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aperçu Foxpay</title>

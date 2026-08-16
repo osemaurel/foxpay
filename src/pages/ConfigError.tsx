@@ -4,11 +4,11 @@
  */
 export default function ConfigError({ missing }: { missing: string[] }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink p-4">
-      <div className="w-full max-w-lg rounded-xl border border-line bg-ink-card p-8 shadow-sm">
-        <h1 className="text-lg font-semibold text-chalk">Configuration incomplète</h1>
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-lg rounded-xl border border-line bg-card p-8 shadow-sm">
+        <h1 className="text-lg font-semibold text-ink">Configuration incomplète</h1>
 
-        <p className="mt-3 text-chalk-muted">
+        <p className="mt-3 text-ink-muted">
           {missing.length > 1 ? 'Ces variables manquaient' : 'Cette variable manquait'} au
           moment de construire l'application :
         </p>
@@ -17,20 +17,20 @@ export default function ConfigError({ missing }: { missing: string[] }) {
           {missing.map((name) => (
             <li
               key={name}
-              className="rounded-lg bg-ink-raised px-3 py-2 font-mono text-sm text-chalk"
+              className="rounded-lg bg-raise px-3 py-2 font-mono text-sm text-ink"
             >
               {name}
             </li>
           ))}
         </ul>
 
-        <p className="mt-5 text-sm leading-relaxed text-chalk-muted">
+        <p className="mt-5 text-sm leading-relaxed text-ink-muted">
           Ajoute-les dans les variables d'environnement de ton hébergeur, puis{' '}
           <strong>relance un déploiement</strong>. Vite remplace ces valeurs pendant le build :
           les ajouter sans reconstruire ne change rien.
         </p>
 
-        <p className="mt-3 text-sm leading-relaxed text-chalk-faint">
+        <p className="mt-3 text-sm leading-relaxed text-ink-faint">
           Sur Vercel, l'intégration Supabase injecte des variables nommées{' '}
           <code className="font-mono">SUPABASE_URL</code> et{' '}
           <code className="font-mono">NEXT_PUBLIC_SUPABASE_…</code>. Vite ne lit que les noms

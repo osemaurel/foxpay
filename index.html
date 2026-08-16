@@ -1,8 +1,23 @@
 <!doctype html>
 <html lang="fr">
   <head>
-    <style>html,body{background:#000;margin:0}</style>
-    <meta charset="UTF-8" />
+    <script>
+      // Appliqué avant le rendu : sinon la page clignote en sombre au chargement
+      // pour quelqu'un qui a choisi le clair.
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem('foxpay-theme') === 'light' ? 'light' : 'dark'
+      } catch (e) {
+        document.documentElement.dataset.theme = 'dark'
+      }
+    </script>
+    <style>
+      html { background: #000 }
+      html[data-theme="light"] { background: #f6f6f7 }
+      body { margin: 0 }
+    </style>
+
+        <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Boutique</title>
     <style>
@@ -11,13 +26,13 @@
         max-width: 40rem;
         margin: 15vh auto;
         padding: 0 1.5rem;
-        color: #ffffff;
+        color: light-dark(#09090b, #ffffff);
         line-height: 1.6;
       }
       #boot h1 { font-size: 1.125rem; margin: 0 0 0.75rem; }
       #boot pre {
-        background: #0a0a0a;
-        border: 1px solid rgba(255,255,255,0.08);
+        background: light-dark(rgba(9,9,11,0.05), #0a0a0a);
+        border: 1px solid light-dark(rgba(9,9,11,0.12), rgba(255,255,255,0.08));
         border-radius: 0.5rem;
         padding: 0.75rem;
         overflow-x: auto;
@@ -25,7 +40,7 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
-      #boot .muted { color: rgba(255,255,255,0.4); font-size: 0.875rem; }
+      #boot .muted { color: light-dark(rgba(9,9,11,0.5), rgba(255,255,255,0.4)); font-size: 0.875rem; }
     </style>
   </head>
   <body>

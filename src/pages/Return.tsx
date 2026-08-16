@@ -55,20 +55,20 @@ export default function Return() {
   }, [orderId])
 
   if (!orderId) {
-    return <Wrapper><p className="text-chalk-faint">Commande introuvable.</p></Wrapper>
+    return <Wrapper><p className="text-ink-faint">Commande introuvable.</p></Wrapper>
   }
 
   if (state?.status === 'paid') {
     return (
       <Wrapper>
         <Alert kind="ok">Paiement confirmé. Merci !</Alert>
-        <p className="mt-4 text-chalk-muted">
+        <p className="mt-4 text-ink-muted">
           Le lien de téléchargement vient de partir par email. Il est valable 24 h.
         </p>
         {state.download_url && (
           <a
             href={state.download_url}
-            className="mt-4 block rounded-lg bg-white px-4 py-3 text-center font-medium text-black transition hover:bg-white/90"
+            className="mt-4 block rounded-lg bg-white px-4 py-3 text-center font-medium text-black transition hover:opacity-90"
           >
             Télécharger maintenant
           </a>
@@ -91,7 +91,7 @@ export default function Return() {
   if (timedOut) {
     return (
       <Wrapper>
-        <p className="text-chalk-muted">
+        <p className="text-ink-muted">
           La confirmation prend plus de temps que prévu. Si le paiement est passé, tu recevras
           le lien par email dès que l'opérateur nous le confirme — inutile de payer à nouveau.
         </p>
@@ -103,14 +103,14 @@ export default function Return() {
   return (
     <Wrapper>
       <Spinner label="Confirmation du paiement en cours…" />
-      <p className="text-center text-sm text-chalk-faint">Ne ferme pas cette page.</p>
+      <p className="text-center text-sm text-ink-faint">Ne ferme pas cette page.</p>
     </Wrapper>
   )
 }
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink p-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-md">
         <Card>{children}</Card>
       </div>
@@ -120,7 +120,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 function BackLink() {
   return (
-    <Link to=".." relative="path" className="mt-4 block text-center text-sm text-chalk-faint underline">
+    <Link to=".." relative="path" className="mt-4 block text-center text-sm text-ink-faint underline">
       Retour à la boutique
     </Link>
   )

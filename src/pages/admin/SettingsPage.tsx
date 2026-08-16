@@ -126,7 +126,7 @@ export default function SettingsPage() {
                 onChange={(e) => set('accent_color', e.target.value)}
                 className="h-10 w-16 rounded-lg border border-line"
               />
-              <code className="font-mono text-sm text-chalk-muted">{form.accent_color}</code>
+              <code className="font-mono text-sm text-ink-muted">{form.accent_color}</code>
             </div>
           </Field>
         </div>

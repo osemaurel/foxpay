@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { slugify } from '../../lib/slug'
 import type { Product, Shop } from '../../lib/types'
 import { Alert, Button, Card, Field, inputClass, Spinner } from '../../components/ui'
+import ThemeToggle from '../../components/ThemeToggle'
 
 export type AdminContext = {
   shop: Shop
@@ -76,7 +77,7 @@ export default function AdminLayout({ session }: { session: Session }) {
 
   return (
     <Shell email={session.user.email} shop={shop}>
-      <nav className="border-b border-line bg-ink-raised">
+      <nav className="border-b border-line bg-raise">
         <div className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-4">
           {TABS.map((tab) => (
             <NavLink
@@ -86,8 +87,8 @@ export default function AdminLayout({ session }: { session: Session }) {
               className={({ isActive }) =>
                 'whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition ' +
                 (isActive
-                  ? 'border-[var(--accent)] text-chalk'
-                  : 'border-transparent text-chalk-faint hover:text-chalk')
+                  ? 'border-[var(--accent)] text-ink'
+                  : 'border-transparent text-ink-faint hover:text-ink')
               }
             >
               {tab.label}
@@ -113,21 +114,24 @@ function Shell({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-ink">
-      <header className="border-b border-line bg-ink-raised">
+    <div className="min-h-screen bg-canvas">
+      <header className="border-b border-line bg-raise">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
           <div className="min-w-0">
-            <h1 className="truncate font-semibold text-chalk">
+            <h1 className="truncate font-semibold text-ink">
               {shop ? shop.name : 'Administration'}
             </h1>
-            {email && <p className="truncate text-xs text-chalk-faint">{email}</p>}
+            {email && <p className="truncate text-xs text-ink-faint">{email}</p>}
           </div>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="shrink-0 text-sm text-chalk-faint hover:text-chalk"
-          >
-            Déconnexion
-          </button>
+          <div className="flex shrink-0 items-center gap-3">
+            <ThemeToggle />
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="text-sm text-ink-faint transition hover:text-ink"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
       </header>
       {children}
@@ -159,7 +163,7 @@ function CreateShop({ ownerId, onCreated }: { ownerId: string; onCreated: () => 
 
   return (
     <Card title="Crée ta boutique">
-      <p className="mb-4 text-sm text-chalk-muted">
+      <p className="mb-4 text-sm text-ink-muted">
         Deux informations suffisent pour commencer. Tout le reste se règle ensuite.
       </p>
       <form onSubmit={submit} className="space-y-4">

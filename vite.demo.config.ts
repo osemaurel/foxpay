@@ -58,6 +58,11 @@ export default defineConfig({
     // Les polices doivent finir en data URI dans le CSS, sinon l'aperçu
     // en fichier unique les perd et retombe sur la police système.
     assetsInlineLimit: 10_000_000,
-    rollupOptions: { input: resolve(__dirname, 'demo.html') },
+    rollupOptions: {
+      input: resolve(__dirname, 'demo.html'),
+      // L'aperçu tient en un seul fichier : l'éditeur, chargé à la demande dans
+      // l'app réelle, doit être fusionné ici sinon il n'existe plus.
+      output: { inlineDynamicImports: true },
+    },
   },
 })

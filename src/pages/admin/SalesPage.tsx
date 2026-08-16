@@ -9,7 +9,7 @@ const STATUS: Record<Order['status'], { text: string; className: string }> = {
   paid: { text: 'Payé', className: 'bg-go/15 text-go' },
   pending: { text: 'En attente', className: 'bg-wait/15 text-wait' },
   failed: { text: 'Échoué', className: 'bg-stop/15 text-stop' },
-  cancelled: { text: 'Annulé', className: 'bg-white/5 text-chalk-muted' },
+  cancelled: { text: 'Annulé', className: 'bg-tint text-ink-muted' },
 }
 
 const FILTERS = [
@@ -47,18 +47,18 @@ export default function SalesPage() {
       <Card title="Résumé">
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
           <div>
-            <p className="text-2xl font-semibold tabular-nums text-chalk">
+            <p className="text-2xl font-semibold tabular-nums text-ink">
               {formatPrice(total)}
             </p>
-            <p className="text-sm text-chalk-faint">Total encaissé</p>
+            <p className="text-sm text-ink-faint">Total encaissé</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold tabular-nums text-chalk">{paid.length}</p>
-            <p className="text-sm text-chalk-faint">{paid.length > 1 ? 'ventes' : 'vente'}</p>
+            <p className="text-2xl font-semibold tabular-nums text-ink">{paid.length}</p>
+            <p className="text-sm text-ink-faint">{paid.length > 1 ? 'ventes' : 'vente'}</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold tabular-nums text-chalk">{orders.length}</p>
-            <p className="text-sm text-chalk-faint">tentatives au total</p>
+            <p className="text-2xl font-semibold tabular-nums text-ink">{orders.length}</p>
+            <p className="text-sm text-ink-faint">tentatives au total</p>
           </div>
         </div>
       </Card>
@@ -73,8 +73,8 @@ export default function SalesPage() {
                 className={
                   'rounded-full px-3 py-1 text-sm transition ' +
                   (filter === f.id
-                    ? 'bg-white text-black'
-                    : 'text-chalk-faint hover:bg-white/5 hover:text-chalk')
+                    ? 'bg-ink text-canvas'
+                    : 'text-ink-faint hover:bg-tint hover:text-ink')
                 }
               >
                 {f.label}
@@ -85,7 +85,7 @@ export default function SalesPage() {
         </div>
 
         {shown.length === 0 ? (
-          <p className="text-sm text-chalk-faint">
+          <p className="text-sm text-ink-faint">
             {orders.length === 0
               ? "Aucune commande pour l'instant. Elles apparaîtront ici dès le premier achat."
               : 'Aucune commande dans cette catégorie.'}
@@ -93,7 +93,7 @@ export default function SalesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-line text-chalk-faint">
+              <thead className="border-b border-line text-ink-faint">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Date</th>
                   <th className="py-2 pr-4 font-medium">Acheteur</th>
@@ -105,13 +105,13 @@ export default function SalesPage() {
               <tbody>
                 {shown.map((order) => (
                   <tr key={order.id} className="border-b border-line-soft last:border-0">
-                    <td className="whitespace-nowrap py-2 pr-4 text-chalk-faint">
+                    <td className="whitespace-nowrap py-2 pr-4 text-ink-faint">
                       {formatDate(order.created_at)}
                     </td>
-                    <td className="py-2 pr-4 text-chalk">
+                    <td className="py-2 pr-4 text-ink">
                       {order.buyer_email}
                       {order.buyer_name && (
-                        <span className="block text-xs text-chalk-faint">{order.buyer_name}</span>
+                        <span className="block text-xs text-ink-faint">{order.buyer_name}</span>
                       )}
                     </td>
                     <td className="whitespace-nowrap py-2 pr-4 tabular-nums">
@@ -124,7 +124,7 @@ export default function SalesPage() {
                         {STATUS[order.status].text}
                       </span>
                     </td>
-                    <td className="py-2 tabular-nums text-chalk-faint">
+                    <td className="py-2 tabular-nums text-ink-faint">
                       {order.status === 'paid'
                         ? `${order.download_count}/${order.max_downloads}`
                         : '—'}
@@ -169,7 +169,7 @@ function ExportButton({ orders, slug }: { orders: Order[]; slug: string }) {
   return (
     <button
       onClick={download}
-      className="rounded-lg border border-line px-3 py-1.5 text-sm text-chalk-muted hover:bg-ink"
+      className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-canvas"
     >
       Exporter en CSV
     </button>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { uploadProductFile, uploadPublicAsset } from '../../lib/upload'
 import { formatFileSize, formatPrice } from '../../lib/format'
@@ -11,7 +11,12 @@ import {
   ImagePicker,
   inputClass,
 } from '../../components/ui'
+import { isEmptyHtml } from '../../lib/richText'
 import { useAdmin } from './AdminLayout'
+
+// L'éditeur ne concerne que le vendeur : il ne doit pas alourdir le bundle
+// que télécharge un acheteur sur la page boutique.
+const RichTextEditor = lazy(() => import('../../components/RichTextEditor'))
 
 const EMPTY = {
   title: '',
@@ -73,7 +78,7 @@ export default function ProductPage() {
     const payload = {
       shop_id: shop.id,
       title: form.title,
-      description: form.description,
+      description: form.description && !isEmptyHtml(form.description) ? form.description : null,
       price: form.price,
       cover_url: form.cover_url,
       file_path: form.file_path,
@@ -110,13 +115,18 @@ export default function ProductPage() {
             />
           </Field>
 
-          <Field label="Description" hint="Les retours à la ligne sont conservés.">
-            <textarea
-              rows={5}
-              value={form.description ?? ''}
-              onChange={(e) => set('description', e.target.value)}
-              className={inputClass}
-            />
+          <Field
+            label="Description"
+            hint="Gras, italique, listes, titres. La mise en forme apparaît telle quelle sur la boutique."
+          >
+            <Suspense
+              fallback={<div className="min-h-56 rounded-xl border border-line bg-raise" />}
+            >
+              <RichTextEditor
+                value={form.description ?? ''}
+                onChange={(html) => set('description', html)}
+              />
+            </Suspense>
           </Field>
 
           <Field
@@ -145,18 +155,18 @@ export default function ProductPage() {
       </Card>
 
       <Card title="Le fichier livré">
-        <p className="mb-4 text-sm text-chalk-muted">
+        <p className="mb-4 text-sm text-ink-muted">
           Stocké en privé. Il n'est jamais accessible sans paiement : l'acheteur reçoit un lien
           signé, valable 24 h et utilisable 3 fois.
         </p>
 
         {form.file_name ? (
-          <p className="mb-3 rounded-lg bg-white/5 px-3 py-2 text-sm text-chalk">
+          <p className="mb-3 rounded-lg bg-tint px-3 py-2 text-sm text-ink">
             {form.file_name}{' '}
-            <span className="text-chalk-faint">{formatFileSize(form.file_size)}</span>
+            <span className="text-ink-faint">{formatFileSize(form.file_size)}</span>
           </p>
         ) : (
-          <p className="mb-3 text-sm text-chalk-faint">Aucun fichier pour l'instant.</p>
+          <p className="mb-3 text-sm text-ink-faint">Aucun fichier pour l'instant.</p>
         )}
 
         <Field label={form.file_name ? 'Remplacer le fichier' : 'Envoyer le fichier'}>
@@ -183,8 +193,8 @@ export default function ProductPage() {
             className="mt-1 h-4 w-4"
           />
           <span className="text-sm">
-            <span className="font-medium text-chalk">Afficher le produit sur la boutique</span>
-            <span className="block text-chalk-faint">
+            <span className="font-medium text-ink">Afficher le produit sur la boutique</span>
+            <span className="block text-ink-faint">
               {canPublish
                 ? 'Décoche pour retirer la vente sans supprimer le produit.'
                 : 'Il faut un titre, un prix supérieur à zéro et un fichier avant de pouvoir vendre.'}
