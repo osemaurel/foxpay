@@ -1,13 +1,13 @@
 import { admin, downloadUrl } from './admin.ts'
 import { sendDownloadEmail } from './email.ts'
-import { getDepositStatus } from './pawapay.ts'
+import { getCheckout } from './pawapay.ts'
 
 const DOWNLOAD_WINDOW_HOURS = 24
 
 export type SettleResult = 'paid' | 'failed' | 'pending' | 'unknown'
 
 /**
- * Règle une commande à partir du statut réel du dépôt chez pawaPay.
+ * Règle une commande à partir de l'état réel du checkout chez pawaPay.
  *
  * Deux appelants : le callback pawaPay, et le polling de la page de retour.
  * Le polling n'est pas un luxe — un callback peut être retardé, mal configuré
@@ -17,14 +17,14 @@ export type SettleResult = 'paid' | 'failed' | 'pending' | 'unknown'
  * Idempotent : les mises à jour sont filtrées sur status='pending', et l'envoi
  * de l'email est piloté par delivered_at.
  */
-export async function settleOrder(depositId: string): Promise<SettleResult> {
+export async function settleOrder(checkoutId: string): Promise<SettleResult> {
   const { data: order } = await admin
     .from('orders')
     .select(
       'id, status, delivered_at, download_token, buyer_email, ' +
         'shops(name, contact_email), products(title)',
     )
-    .eq('deposit_id', depositId)
+    .eq('checkout_id', checkoutId)
     .maybeSingle()
 
   if (!order) return 'unknown'
@@ -36,13 +36,23 @@ export async function settleOrder(depositId: string): Promise<SettleResult> {
     return 'paid'
   }
 
-  const verified = await getDepositStatus(depositId)
-  if (verified.status === 'PENDING') return 'pending'
+  const checkout = await getCheckout(checkoutId)
+  if (!checkout) return 'pending'
 
-  if (verified.status === 'FAILED') {
+  // WAITING_PAYMENT et PROCESSING ne sont pas des fins de course.
+  if (checkout.status === 'WAITING_PAYMENT' || checkout.status === 'PROCESSING') {
+    return 'pending'
+  }
+
+  if (checkout.status !== 'COMPLETED') {
+    // FAILED, EXPIRED ou CANCELLED : la distinction est utile au vendeur, donc
+    // on garde le statut pawaPay dans failure_reason plutôt que de l'aplatir.
     await admin
       .from('orders')
-      .update({ status: 'failed', failure_reason: verified.reason })
+      .update({
+        status: 'failed',
+        failure_reason: checkout.failureReason ?? checkout.status,
+      })
       .eq('id', order.id)
       .eq('status', 'pending')
     return 'failed'
@@ -56,7 +66,9 @@ export async function settleOrder(depositId: string): Promise<SettleResult> {
       download_expires_at: new Date(
         Date.now() + DOWNLOAD_WINDOW_HOURS * 3600 * 1000,
       ).toISOString(),
-      provider_transaction_id: verified.providerTransactionId,
+      provider_transaction_id: checkout.providerTransactionId,
+      // Le pays n'est connu qu'ici : c'est celui depuis lequel l'acheteur a payé.
+      country: checkout.country,
     })
     .eq('id', order.id)
     .eq('status', 'pending')

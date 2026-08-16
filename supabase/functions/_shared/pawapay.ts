@@ -1,16 +1,15 @@
 import { requireEnv } from './admin.ts'
 
 /**
- * Intégration pawaPay (Merchant API v2).
+ * Intégration pawaPay — Merchant API v2, endpoint « checkouts ».
  *
- * ⚠️ À VÉRIFIER CONTRE LA DOC (docs.pawapay.io/v2) AVANT LA MISE EN PRODUCTION.
- * Le domaine de la documentation était inaccessible au moment d'écrire ce
- * fichier, la forme exacte du corps de `openPaymentPage` est donc reconstituée.
- * Les champs sûrs : depositId (UUIDv4 fourni par le marchand), returnUrl,
- * reason, msisdn. Les champs à confirmer sont marqués ci-dessous.
+ * Écrit contre la documentation officielle (docs.pawapay.io/v2), pas reconstitué.
  *
- * Le reste du code ne dépend pas de ces détails : la confirmation de paiement
- * passe par getDepositStatus(), jamais par le corps du callback.
+ * Pourquoi « checkout » et non « payment page » : le checkout garde une seule
+ * référence pour tout le paiement, y compris les tentatives ratées. En mobile
+ * money, un échec est banal — code PIN saisi trop tard, solde insuffisant — et
+ * le client réessaie sur la même page. Avec la payment page, chaque essai créait
+ * une commande orpheline chez nous.
  */
 
 const baseUrl = () =>
@@ -23,32 +22,93 @@ function headers() {
   }
 }
 
-export type PaymentPageInput = {
-  depositId: string
+/**
+ * Zone franc CFA. XOF et XAF sont tous deux arrimés à l'euro au même taux
+ * (655,957), donc un prix de 15 000 vaut 15 000 dans les deux devises : le même
+ * montant couvre les sept pays sans aucune conversion.
+ *
+ * pawaPay ne convertit jamais : il affiche le montant fourni pour le pays
+ * choisi par l'acheteur. Sortir de la zone CFA imposerait donc un prix par
+ * devise, ce qui est une décision commerciale, pas technique.
+ */
+export const CFA_ZONE = [
+  { country: 'BEN', currency: 'XOF' },
+  { country: 'BFA', currency: 'XOF' },
+  { country: 'CIV', currency: 'XOF' },
+  { country: 'SEN', currency: 'XOF' },
+  { country: 'CMR', currency: 'XAF' },
+  { country: 'COG', currency: 'XAF' },
+  { country: 'GAB', currency: 'XAF' },
+] as const
+
+/** Un montant par pays : l'acheteur choisit son pays, la page affiche le sien. */
+export function cfaAmounts(amount: number) {
+  return CFA_ZONE.map(({ country, currency }) => ({
+    country,
+    currency,
+    amount: String(amount),
+  }))
+}
+
+/**
+ * `reason` s'affiche sur la page de paiement et pawaPay le valide strictement :
+ * 4 à 22 caractères, lettres chiffres et espaces uniquement. Un titre avec une
+ * apostrophe ou un tiret ferait rejeter la requête entière, d'où le nettoyage
+ * plutôt qu'une simple troncature.
+ */
+export function sanitizeReason(text: string): string {
+  const clean = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 22)
+    .trim()
+
+  return clean.length >= 4 ? clean : 'Achat en ligne'
+}
+
+export type CheckoutCreated = {
+  redirectUrl: string
+  checkoutCode: string
+}
+
+/** Crée un checkout et renvoie l'URL de la page de paiement hébergée. */
+export async function createCheckout(input: {
+  checkoutId: string
   amount: number
-  currency: string
-  country: string
   returnUrl: string
   reason: string
   msisdn?: string | null
-}
+}): Promise<CheckoutCreated> {
+  const reason = sanitizeReason(input.reason)
 
-/** Ouvre une Payment Page hébergée et renvoie l'URL de redirection. */
-export async function openPaymentPage(input: PaymentPageInput): Promise<string> {
   const body: Record<string, unknown> = {
-    depositId: input.depositId,
+    checkoutId: input.checkoutId,
     returnUrl: input.returnUrl,
-    // `reason` s'affiche sur la page de paiement, limité côté pawaPay.
-    reason: input.reason.slice(0, 22),
-    // ⚠️ À CONFIRMER : en v2 le montant est regroupé avec la devise dans
-    // amountDetails, et le montant est une chaîne. Le XOF n'ayant pas de
-    // décimales, on envoie l'entier tel quel.
-    amountDetails: { amount: String(input.amount), currency: input.currency },
-    country: input.country,
+    returnMethod: 'INSTANT',
+    defaultLanguage: 'fr',
+    amounts: cfaAmounts(input.amount),
+    reason: { fr: reason, en: reason },
+    // Entre 3 et 60 minutes. 30 laisse le temps de chercher son téléphone sans
+    // laisser une commande en attente toute la journée.
+    expiresAfter: 30,
   }
-  if (input.msisdn) body.msisdn = input.msisdn
 
-  const res = await fetch(`${baseUrl()}/v2/paymentpage`, {
+  if (input.msisdn) {
+    body.payer = {
+      type: 'MMO',
+      accountDetails: {
+        phoneNumber: input.msisdn,
+        // Le numéro n'est qu'une suggestion : l'acheteur doit pouvoir payer
+        // depuis un autre portefeuille que celui qu'il nous a donné.
+        allowCustomerToOverride: true,
+      },
+    }
+  }
+
+  const res = await fetch(`${baseUrl()}/v2/checkouts`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify(body),
@@ -58,68 +118,80 @@ export async function openPaymentPage(input: PaymentPageInput): Promise<string> 
   if (!res.ok) throw new Error(`pawaPay ${res.status} : ${text}`)
 
   const data = JSON.parse(text)
-  const url = data.redirectUrl ?? data.url
-  if (!url) throw new Error(`Réponse pawaPay sans redirectUrl : ${text}`)
-  return url as string
+
+  // Un HTTP 200 ne veut pas dire accepté : le statut est dans le corps.
+  if (data.status === 'REJECTED') {
+    const reason = data.failureReason ?? {}
+    throw new Error(
+      `pawaPay a refusé le paiement (${reason.failureCode ?? 'inconnu'}) : ` +
+        (reason.failureMessage ?? text),
+    )
+  }
+
+  if (!data.redirectUrl) {
+    // DUPLICATE_IGNORED tombe ici : le checkout existe déjà, mais la réponse
+    // ne renvoie pas d'URL. On le signale plutôt que de rediriger dans le vide.
+    throw new Error(`Réponse pawaPay sans redirectUrl (statut ${data.status}) : ${text}`)
+  }
+
+  return { redirectUrl: data.redirectUrl, checkoutCode: data.checkoutCode }
 }
 
-export type DepositStatus = 'COMPLETED' | 'FAILED' | 'PENDING'
+/** Statuts de cycle de vie d'un checkout, tels que documentés. */
+export type CheckoutStatus =
+  | 'WAITING_PAYMENT'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'EXPIRED'
+  | 'CANCELLED'
+
+export type CheckoutState = {
+  status: CheckoutStatus
+  providerTransactionId: string | null
+  /** Pays depuis lequel l'acheteur a effectivement payé. */
+  country: string | null
+  failureReason: string | null
+}
 
 /**
- * Source de vérité du paiement : on redemande le statut à pawaPay au lieu de
- * croire le corps du callback. Ça protège d'un faux callback et rend le code
- * insensible à la forme exacte du payload.
+ * Source de vérité du paiement : on redemande l'état à pawaPay plutôt que de
+ * croire le corps d'un callback, qui peut être forgé par n'importe qui.
  */
-export async function getDepositStatus(
-  depositId: string,
-): Promise<{ status: DepositStatus; providerTransactionId: string | null; reason: string | null }> {
-  const res = await fetch(`${baseUrl()}/v2/deposits/${depositId}`, { headers: headers() })
+export async function getCheckout(checkoutId: string): Promise<CheckoutState | null> {
+  const res = await fetch(`${baseUrl()}/v2/checkouts/${checkoutId}`, { headers: headers() })
   const text = await res.text()
   if (!res.ok) throw new Error(`pawaPay ${res.status} : ${text}`)
 
-  const deposit = findDeposit(JSON.parse(text))
-  const raw = String(deposit?.status ?? '').toUpperCase()
+  const payload = JSON.parse(text)
+  // La réponse est enveloppée : { status: "FOUND", data: { ... } }
+  if (payload.status !== 'FOUND' || !payload.data) return null
+
+  const data = payload.data
+  const deposit = data.deposit ?? null
 
   return {
-    status: raw === 'COMPLETED' ? 'COMPLETED' : raw === 'FAILED' ? 'FAILED' : 'PENDING',
-    providerTransactionId: (deposit?.providerTransactionId as string) ?? null,
-    reason:
-      (deposit?.failureReason as { failureMessage?: string })?.failureMessage ??
-      (deposit?.failureReason as string) ??
+    status: data.status as CheckoutStatus,
+    providerTransactionId: data.providerTransactionId ?? deposit?.providerTransactionId ?? null,
+    country: deposit?.country ?? null,
+    failureReason:
+      deposit?.failureReason?.failureMessage ??
+      deposit?.failureReason?.failureCode ??
       null,
   }
 }
 
-/**
- * pawaPay a enveloppé la réponse différemment entre v1 et v2 (objet nu, tableau,
- * ou { data: { deposit } }). On cherche l'objet qui porte un depositId plutôt
- * que de parier sur un seul niveau d'imbrication.
- */
-function findDeposit(payload: unknown): Record<string, unknown> | null {
-  if (Array.isArray(payload)) {
-    for (const item of payload) {
-      const found = findDeposit(item)
-      if (found) return found
-    }
-    return null
-  }
-  if (payload && typeof payload === 'object') {
-    const obj = payload as Record<string, unknown>
-    if ('depositId' in obj && 'status' in obj) return obj
-    for (const value of Object.values(obj)) {
-      const found = findDeposit(value)
-      if (found) return found
-    }
-  }
-  return null
-}
+/** Extrait le checkoutId d'un callback, quelle que soit son enveloppe. */
+export function extractCheckoutId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
 
-/** Extrait le depositId d'un callback, quelle que soit son enveloppe. */
-export function extractDepositId(payload: unknown): string | null {
-  const deposit = findDeposit(payload)
-  if (deposit) return String(deposit.depositId)
-  if (payload && typeof payload === 'object' && 'depositId' in payload) {
-    return String((payload as Record<string, unknown>).depositId)
+  const direct = (payload as Record<string, unknown>).checkoutId
+  if (typeof direct === 'string') return direct
+
+  const data = (payload as Record<string, unknown>).data
+  if (data && typeof data === 'object') {
+    const nested = (data as Record<string, unknown>).checkoutId
+    if (typeof nested === 'string') return nested
   }
   return null
 }

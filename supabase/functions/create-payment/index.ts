@@ -1,6 +1,6 @@
 import { admin, SITE_URL } from '../_shared/admin.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
-import { openPaymentPage } from '../_shared/pawapay.ts'
+import { createCheckout } from '../_shared/pawapay.ts'
 
 type Body = {
   slug?: string
@@ -16,7 +16,6 @@ type Product = {
   title: string
   price: number
   currency: string
-  is_active: boolean
 }
 
 Deno.serve(async (req) => {
@@ -37,18 +36,17 @@ Deno.serve(async (req) => {
 
   const { data: shop } = await admin
     .from('shops')
-    .select('id, slug, name, country')
+    .select('id, slug, name')
     .eq('slug', slug)
     .maybeSingle()
 
   if (!shop) return fail('Boutique introuvable', 404)
 
   // Le produit est désigné par son lien. Sans lui — vieil onglet ouvert avant
-  // le passage au multi-produit — on retombe sur le premier produit en vente
-  // plutôt que d'échouer.
+  // le passage au multi-produit — on retombe sur le premier produit en vente.
   const query = admin
     .from('products')
-    .select('id, slug, title, price, currency, is_active')
+    .select('id, slug, title, price, currency')
     .eq('shop_id', shop.id)
     .eq('is_active', true)
 
@@ -61,7 +59,7 @@ Deno.serve(async (req) => {
   if (item.price <= 0) return fail('Produit mal configuré', 409)
 
   // Le montant est figé ici : un changement de prix ultérieur n'affecte pas
-  // cette commande.
+  // cette commande. Le pays reste nul, il dépend de l'acheteur.
   const { data: order, error: orderError } = await admin
     .from('orders')
     .insert({
@@ -72,26 +70,29 @@ Deno.serve(async (req) => {
       buyer_phone: body.buyer_phone?.replace(/\D/g, '') || null,
       amount: item.price,
       currency: item.currency,
-      country: shop.country,
     })
-    .select('id, deposit_id, buyer_phone')
+    .select('id, checkout_id, buyer_phone')
     .single()
 
   if (orderError) return fail(`Création de la commande impossible : ${orderError.message}`, 500)
 
   try {
-    const redirectUrl = await openPaymentPage({
-      depositId: order.deposit_id,
+    // pawaPay ajoute le checkoutCode à cette URL au retour de l'acheteur ;
+    // c'est par lui qu'on retrouvera la commande.
+    const { redirectUrl, checkoutCode } = await createCheckout({
+      checkoutId: order.checkout_id,
       amount: item.price,
-      currency: item.currency,
-      country: shop.country,
-      returnUrl: `${SITE_URL()}/boutique/${shop.slug}/retour?order=${order.id}`,
+      returnUrl: `${SITE_URL()}/boutique/${shop.slug}/retour`,
       reason: item.title,
       msisdn: order.buyer_phone,
     })
 
-    await admin.from('orders').update({ checkout_url: redirectUrl }).eq('id', order.id)
-    return json({ orderId: order.id, redirectUrl })
+    await admin
+      .from('orders')
+      .update({ checkout_url: redirectUrl, checkout_code: checkoutCode })
+      .eq('id', order.id)
+
+    return json({ orderId: order.id, checkoutCode, redirectUrl })
   } catch (e) {
     // La commande reste tracée en 'failed' : on veut voir les échecs
     // d'initiation dans l'admin, pas seulement les paiements refusés.

@@ -20,12 +20,20 @@ const DEADLINE_MS = 3 * 60 * 1000
 
 export default function Return() {
   const [params] = useSearchParams()
+  // pawaPay ajoute checkoutCode à l'URL de retour. On garde `order` en repli
+  // pour les commandes créées avant ce changement.
+  const checkoutCode = params.get('checkoutCode')
   const orderId = params.get('order')
+  const reference = checkoutCode
+    ? { checkout_code: checkoutCode }
+    : orderId
+      ? { order_id: orderId }
+      : null
   const [state, setState] = useState<Status | null>(null)
   const [timedOut, setTimedOut] = useState(false)
 
   useEffect(() => {
-    if (!orderId) return
+    if (!reference) return
     const deadline = Date.now() + DEADLINE_MS
     let delay = FIRST_DELAY_MS
     let stopped = false
@@ -33,7 +41,7 @@ export default function Return() {
     async function poll() {
       if (stopped) return
       try {
-        const result = await callFunction<Status>('order-status', { order_id: orderId })
+        const result = await callFunction<Status>('order-status', reference)
         if (stopped) return
         setState(result)
         if (result.status !== 'pending') return
@@ -52,9 +60,9 @@ export default function Return() {
     return () => {
       stopped = true
     }
-  }, [orderId])
+  }, [checkoutCode, orderId])
 
-  if (!orderId) {
+  if (!reference) {
     return <Wrapper><p className="text-ink-faint">Commande introuvable.</p></Wrapper>
   }
 

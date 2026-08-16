@@ -8,7 +8,6 @@ export type Shop = {
   banner_url: string | null
   accent_color: string
   contact_email: string | null
-  country: string
   created_at: string
   updated_at: string
 }
@@ -65,8 +64,10 @@ export type Order = {
   currency: string
   status: OrderStatus
   provider: string
-  deposit_id: string
-  country: string
+  checkout_id: string
+  checkout_code: string | null
+  /** Pays depuis lequel l'acheteur a payé, connu à la confirmation. */
+  country: string | null
   provider_transaction_id: string | null
   failure_reason: string | null
   checkout_url: string | null
@@ -79,14 +80,3 @@ export type Order = {
   created_at: string
   updated_at: string
 }
-
-/** Pays de la zone franc CFA (XOF) couverts par pawaPay. */
-export const XOF_COUNTRIES: { code: string; name: string }[] = [
-  { code: 'BEN', name: 'Bénin' },
-  { code: 'BFA', name: 'Burkina Faso' },
-  { code: 'CIV', name: "Côte d'Ivoire" },
-  { code: 'MLI', name: 'Mali' },
-  { code: 'NER', name: 'Niger' },
-  { code: 'SEN', name: 'Sénégal' },
-  { code: 'TGO', name: 'Togo' },
-]

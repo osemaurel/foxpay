@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { uploadPublicAsset } from '../../lib/upload'
 import { slugify } from '../../lib/slug'
-import { XOF_COUNTRIES, type Shop } from '../../lib/types'
+import type { Shop } from '../../lib/types'
 import { Alert, Button, Card, Field, ImagePicker, inputClass } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
@@ -45,7 +45,6 @@ export default function SettingsPage() {
         banner_url: form.banner_url,
         accent_color: form.accent_color,
         contact_email: form.contact_email,
-        country: form.country,
       })
       .eq('id', shop.id)
       .select()
@@ -133,23 +132,14 @@ export default function SettingsPage() {
       </Card>
 
       <Card title="Paiement et contact">
+        <p className="mb-5 text-sm text-ink-muted">
+          Tes acheteurs paient en mobile money depuis les sept pays de la zone franc CFA
+          (Bénin, Burkina&nbsp;Faso, Cameroun, Congo, Côte&nbsp;d'Ivoire, Gabon, Sénégal).
+          Chacun choisit son pays et son opérateur au moment de payer ; ton prix reste le même,
+          le XOF et le XAF ayant la même valeur.
+        </p>
+
         <div className="space-y-4">
-          <Field
-            label="Pays"
-            hint="Détermine les opérateurs mobile money proposés à l'acheteur."
-          >
-            <select
-              value={form.country}
-              onChange={(e) => set('country', e.target.value)}
-              className={inputClass}
-            >
-              {XOF_COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
 
           <Field
             label="Email de contact"
