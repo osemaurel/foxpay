@@ -25,6 +25,9 @@ const EMPTY = {
   slug: '',
   description: '' as string | null,
   price: 0,
+  compare_at_price: null as number | null,
+  cta_label: null as string | null,
+  cta_color: null as string | null,
   cover_url: null as string | null,
   file_path: null as string | null,
   file_name: null as string | null,
@@ -112,6 +115,9 @@ export default function ProductEdit() {
       description:
         form.description && !isEmptyHtml(form.description) ? form.description : null,
       price: form.price,
+      compare_at_price: form.compare_at_price || null,
+      cta_label: form.cta_label?.trim() || null,
+      cta_color: form.cta_color || null,
       cover_url: form.cover_url,
       file_path: form.file_path,
       file_name: form.file_name,
@@ -210,20 +216,44 @@ export default function ProductEdit() {
             </Suspense>
           </Field>
 
-          <Field
-            label="Prix (XOF)"
-            hint={form.price > 0 ? `Affiché : ${formatPrice(form.price)}` : 'Nombre entier.'}
-          >
-            <input
-              type="number"
-              min={0}
-              step={1}
-              required
-              value={form.price}
-              onChange={(e) => set('price', Number(e.target.value))}
-              className={inputClass}
-            />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Prix (XOF)"
+              hint={form.price > 0 ? `Affiché : ${formatPrice(form.price)}` : 'Nombre entier.'}
+            >
+              <input
+                type="number"
+                min={0}
+                step={1}
+                required
+                value={form.price}
+                onChange={(e) => set('price', Number(e.target.value))}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field
+              label="Prix barré (facultatif)"
+              hint={
+                form.compare_at_price && form.compare_at_price > form.price
+                  ? `Remise affichée : −${Math.round(
+                      (1 - form.price / form.compare_at_price) * 100,
+                    )} %`
+                  : 'Doit être supérieur au prix. Laisse vide pour ne rien barrer.'
+              }
+            >
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={form.compare_at_price ?? ''}
+                onChange={(e) =>
+                  set('compare_at_price', e.target.value ? Number(e.target.value) : null)
+                }
+                className={inputClass}
+              />
+            </Field>
+          </div>
 
           <ImagePicker
             label="Image du produit"
@@ -263,6 +293,57 @@ export default function ProductEdit() {
             className={fileInputClass}
           />
         </Field>
+      </Card>
+
+      <Card title="Bouton d'achat">
+        <p className="mb-4 text-sm text-ink-muted">
+          C'est le bouton sur lequel l'acheteur clique. Laisse vide pour garder le texte et la
+          couleur par défaut de la boutique.
+        </p>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Texte du bouton" hint="40 caractères maximum.">
+            <input
+              maxLength={40}
+              placeholder="Acheter"
+              value={form.cta_label ?? ''}
+              onChange={(e) => set('cta_label', e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field label="Couleur du bouton">
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={form.cta_color ?? shop.accent_color}
+                onChange={(e) => set('cta_color', e.target.value)}
+                className="h-10 w-16 rounded-lg border border-line"
+              />
+              {form.cta_color ? (
+                <button
+                  type="button"
+                  onClick={() => set('cta_color', null)}
+                  className="text-sm text-ink-faint underline underline-offset-2 hover:text-ink"
+                >
+                  Revenir à la couleur de la boutique
+                </button>
+              ) : (
+                <span className="text-sm text-ink-faint">Couleur de la boutique</span>
+              )}
+            </div>
+          </Field>
+        </div>
+
+        <div className="mt-6">
+          <p className="mb-2 text-xs text-ink-faint">Aperçu</p>
+          <span
+            className="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white"
+            style={{ backgroundColor: form.cta_color ?? shop.accent_color }}
+          >
+            {form.cta_label?.trim() || 'Acheter'}
+          </span>
+        </div>
       </Card>
 
       <Card title="Mise en vente">

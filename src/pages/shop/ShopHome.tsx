@@ -93,12 +93,19 @@ function ProductCard({ shop, product }: { shop: Shop; product: Product }) {
 
       <div className="flex flex-1 flex-col p-5">
         <h2 className="font-medium leading-snug text-ink">{product.title}</h2>
-        <p
-          className="mt-auto pt-4 text-xl font-medium tabular-nums"
-          style={{ color: 'var(--accent)' }}
-        >
-          {formatPrice(product.price, product.currency)}
-        </p>
+        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 pt-4">
+          <span
+            className="text-xl font-medium tabular-nums"
+            style={{ color: product.cta_color ?? 'var(--accent)' }}
+          >
+            {formatPrice(product.price, product.currency)}
+          </span>
+          {product.compare_at_price && (
+            <span className="text-sm tabular-nums text-ink-faint line-through">
+              {formatPrice(product.compare_at_price, product.currency)}
+            </span>
+          )}
+        </div>
       </div>
     </Link>
   )

@@ -80,7 +80,7 @@ function Preview() {
   return (
     <>
       <div className="sticky top-0 z-50 border-b border-stone-700 bg-stone-900">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
           <span className="text-sm font-semibold tracking-wide text-stone-100">
             Aperçu Foxpay
           </span>
@@ -91,7 +91,7 @@ function Preview() {
                 onClick={() => setCurrent(screen)}
                 aria-current={screen.id === current.id}
                 className={
-                  'rounded-full px-3 py-1.5 text-sm transition ' +
+                  'rounded-full px-2.5 py-1 text-xs transition sm:px-3 sm:py-1.5 sm:text-sm ' +
                   (screen.id === current.id
                     ? 'bg-stone-100 text-stone-900'
                     : 'text-stone-300 hover:bg-stone-800 hover:text-stone-100')
@@ -102,7 +102,7 @@ function Preview() {
             ))}
           </nav>
         </div>
-        <p className="mx-auto max-w-5xl px-4 pb-3 text-sm text-stone-400">{current.note}</p>
+        <p className="mx-auto hidden max-w-5xl px-4 pb-3 text-sm text-stone-400 sm:block">{current.note}</p>
       </div>
 
       <div key={current.id}>{current.render()}</div>

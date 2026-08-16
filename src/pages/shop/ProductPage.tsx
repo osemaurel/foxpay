@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { callFunction } from '../../lib/supabase'
 import type { Product, Shop } from '../../lib/types'
 import { formatFileSize, formatPrice } from '../../lib/format'
-import { Alert, Button, Eyebrow, Field, inputClass } from '../../components/ui'
+import { Alert, Eyebrow, Field, inputClass } from '../../components/ui'
 import RichContent from '../../components/RichContent'
 import { useShop } from './ShopLayout'
 
@@ -11,6 +11,27 @@ export default function ProductPage() {
   const { productSlug } = useParams<{ productSlug: string }>()
   const { shop, products } = useShop()
   const product = products.find((p) => p.slug === productSlug)
+
+  const [open, setOpen] = useState(false)
+  const formRef = useRef<HTMLDivElement>(null)
+  const priceRef = useRef<HTMLDivElement>(null)
+  const [priceOffScreen, setPriceOffScreen] = useState(false)
+
+  /**
+   * La barre du bas ne se déclenche pas à une hauteur de défilement arbitraire :
+   * elle apparaît exactement quand le bloc prix quitte l'écran, donc au moment
+   * où l'acheteur perd l'information dont il a besoin pour décider.
+   */
+  useEffect(() => {
+    const el = priceRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setPriceOffScreen(!entry.isIntersecting),
+      { threshold: 0 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [product?.id])
 
   if (!product) {
     return (
@@ -26,44 +47,70 @@ export default function ProductPage() {
     )
   }
 
+  function openForm() {
+    setOpen(true)
+    // Laisse le formulaire se monter avant de le viser.
+    requestAnimationFrame(() =>
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    )
+  }
+
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 sm:py-16">
-      <Link
-        to={`/boutique/${shop.slug}`}
-        className="text-sm text-ink-faint transition hover:text-ink"
-      >
-        ← Catalogue
-      </Link>
+    <>
+      <main className="mx-auto max-w-5xl px-5 py-6 pb-28 sm:py-10 lg:pb-16">
+        <Link
+          to={`/boutique/${shop.slug}`}
+          className="text-sm text-ink-faint transition hover:text-ink"
+        >
+          ← Catalogue
+        </Link>
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:gap-12">
-        <Cover product={product} />
+        <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:gap-12">
+          <Cover product={product} />
 
-        <div>
-          <Eyebrow>Produit numérique</Eyebrow>
+          <div className="min-w-0">
+            {/* Le cadre : nom, prix, bouton. Rien d'autre. */}
+            <section className="rounded-2xl border border-line bg-card p-6 text-center sm:p-8 lg:text-left">
+              <h1 className="text-2xl font-medium leading-tight text-ink sm:text-3xl">
+                {product.title}
+              </h1>
 
-          <h1 className="mt-3 text-3xl font-medium leading-tight text-ink sm:text-4xl">
-            {product.title}
-          </h1>
+              <div ref={priceRef} className="mt-4">
+                <PriceTag product={product} />
+              </div>
 
-          <p
-            className="mt-4 text-3xl font-medium tabular-nums"
-            style={{ color: 'var(--accent)' }}
-          >
-            {formatPrice(product.price, product.currency)}
-          </p>
+              <div className="mt-6">
+                {open ? (
+                  <div ref={formRef}>
+                    <BuyForm shop={shop} product={product} />
+                  </div>
+                ) : (
+                  <BuyButton product={product} onClick={openForm} className="w-full" />
+                )}
+              </div>
 
-          {product.description && (
-            <RichContent value={product.description} className="mt-6 text-ink-muted" />
-          )}
+              <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-ink-faint">
+                Paiement mobile money · Livraison immédiate
+              </p>
+            </section>
 
-          <div className="mt-8">
-            <Buy shop={shop} product={product} />
+            {/* Hors du cadre : la description, puis le détail de la livraison. */}
+            {product.description && (
+              <RichContent value={product.description} className="mt-8 text-ink-muted" />
+            )}
+
+            <Included product={product} />
           </div>
-
-          <Included product={product} />
         </div>
-      </div>
-    </main>
+      </main>
+
+      {/* Barre d'achat mobile, une fois le prix sorti de l'écran. */}
+      <StickyBar
+        product={product}
+        visible={priceOffScreen && !open}
+        onBuy={openForm}
+      />
+    </>
   )
 }
 
@@ -87,6 +134,108 @@ function Cover({ product }: { product: Product }) {
   )
 }
 
+function PriceTag({ product, compact }: { product: Product; compact?: boolean }) {
+  const discount =
+    product.compare_at_price && product.compare_at_price > product.price
+      ? Math.round((1 - product.price / product.compare_at_price) * 100)
+      : null
+
+  return (
+    <div
+      className={
+        'flex flex-wrap items-baseline gap-x-3 gap-y-1 ' +
+        (compact ? '' : 'justify-center lg:justify-start')
+      }
+    >
+      <span
+        className={
+          'font-medium tabular-nums ' + (compact ? 'text-xl' : 'text-3xl sm:text-4xl')
+        }
+        style={{ color: buttonColor(product) }}
+      >
+        {formatPrice(product.price, product.currency)}
+      </span>
+
+      {product.compare_at_price && (
+        <span
+          className={
+            'tabular-nums text-ink-faint line-through ' + (compact ? 'text-sm' : 'text-lg')
+          }
+        >
+          {formatPrice(product.compare_at_price, product.currency)}
+        </span>
+      )}
+
+      {discount !== null && !compact && (
+        <span className="rounded-full bg-go/15 px-2 py-0.5 font-mono text-xs text-go">
+          −{discount} %
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** Couleur du bouton : celle du produit si elle est définie, sinon l'accent. */
+function buttonColor(product: Product): string {
+  return product.cta_color ?? 'var(--accent)'
+}
+
+function BuyButton({
+  product,
+  onClick,
+  className = '',
+}: {
+  product: Product
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ backgroundColor: buttonColor(product) }}
+      className={
+        'inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium ' +
+        'text-white transition hover:brightness-110 ' +
+        className
+      }
+    >
+      {product.cta_label?.trim() || 'Acheter'}
+    </button>
+  )
+}
+
+/**
+ * Barre fixe en bas d'écran, mobile uniquement : sur grand écran le cadre reste
+ * visible en permanence, une barre y serait du bruit.
+ */
+function StickyBar({
+  product,
+  visible,
+  onBuy,
+}: {
+  product: Product
+  visible: boolean
+  onBuy: () => void
+}) {
+  return (
+    <div
+      className={
+        'fixed inset-x-0 bottom-0 z-40 border-t border-line bg-canvas/95 backdrop-blur ' +
+        'transition-transform duration-200 lg:hidden ' +
+        (visible ? 'translate-y-0' : 'translate-y-full')
+      }
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      aria-hidden={!visible}
+    >
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3">
+        <PriceTag product={product} compact />
+        <BuyButton product={product} onClick={onBuy} className="shrink-0" />
+      </div>
+    </div>
+  )
+}
+
 function Included({ product }: { product: Product }) {
   const items = [
     {
@@ -107,7 +256,7 @@ function Included({ product }: { product: Product }) {
   ]
 
   return (
-    <section className="mt-10 grid gap-3 sm:grid-cols-3">
+    <section className="mt-8 grid gap-3 sm:grid-cols-3">
       {items.map((item) => (
         <div key={item.label} className="rounded-xl border border-line bg-raise p-4">
           <Eyebrow>{item.label}</Eyebrow>
@@ -121,8 +270,7 @@ function Included({ product }: { product: Product }) {
   )
 }
 
-function Buy({ shop, product }: { shop: Shop; product: Product }) {
-  const [open, setOpen] = useState(false)
+function BuyForm({ shop, product }: { shop: Shop; product: Product }) {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -149,26 +297,8 @@ function Buy({ shop, product }: { shop: Shop; product: Product }) {
     }
   }
 
-  if (!open) {
-    return (
-      <>
-        <Button accent onClick={() => setOpen(true)} className="w-full sm:w-auto">
-          Acheter — {formatPrice(product.price, product.currency)}
-        </Button>
-        <p className="mt-4 font-mono text-xs uppercase tracking-[0.16em] text-ink-faint">
-          Paiement mobile money · Livraison immédiate
-        </p>
-      </>
-    )
-  }
-
   return (
-    <form
-      onSubmit={buy}
-      className="space-y-5 rounded-2xl border border-line bg-raise p-6 sm:p-8"
-    >
-      <Eyebrow>Finaliser l'achat</Eyebrow>
-
+    <form onSubmit={buy} className="space-y-4 text-left">
       <Field label="Ton email" hint="C'est là que le lien de téléchargement sera envoyé.">
         <input
           type="email"
@@ -180,34 +310,38 @@ function Buy({ shop, product }: { shop: Shop; product: Product }) {
         />
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Ton nom (facultatif)">
-          <input
-            value={name}
-            autoComplete="name"
-            onChange={(e) => setName(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <Field
-          label="Numéro mobile money (facultatif)"
-          hint="Indicatif compris, ex. 2250700000000."
-        >
-          <input
-            inputMode="numeric"
-            autoComplete="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-            className={inputClass}
-          />
-        </Field>
-      </div>
+      <Field label="Ton nom (facultatif)">
+        <input
+          value={name}
+          autoComplete="name"
+          onChange={(e) => setName(e.target.value)}
+          className={inputClass}
+        />
+      </Field>
+
+      <Field
+        label="Numéro mobile money (facultatif)"
+        hint="Indicatif compris, ex. 2250700000000."
+      >
+        <input
+          inputMode="numeric"
+          autoComplete="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+          className={inputClass}
+        />
+      </Field>
 
       {error && <Alert kind="error">{error}</Alert>}
 
-      <Button type="submit" accent disabled={busy} className="w-full">
+      <button
+        type="submit"
+        disabled={busy}
+        style={{ backgroundColor: buttonColor(product) }}
+        className="inline-flex w-full items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-40"
+      >
         {busy ? 'Redirection…' : `Payer ${formatPrice(product.price, product.currency)}`}
-      </Button>
+      </button>
     </form>
   )
 }

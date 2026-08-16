@@ -22,7 +22,13 @@ export type Product = {
   title: string
   description: string | null
   price: number
+  /** Prix de référence affiché barré. Nul = pas de promotion. */
+  compare_at_price: number | null
   currency: string
+  /** Texte du bouton d'achat. Nul = « Acheter ». */
+  cta_label: string | null
+  /** Couleur du bouton propre au produit. Nul = accent de la boutique. */
+  cta_color: string | null
   cover_url: string | null
   file_path: string | null
   file_name: string | null
