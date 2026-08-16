@@ -222,3 +222,59 @@ create policy "product-files: le propriétaire gère son dossier"
   to authenticated
   using (bucket_id = 'product-files' and public.owns_shop_folder(name))
   with check (bucket_id = 'product-files' and public.owns_shop_folder(name));
+
+-- ============================================================
+-- Consommation d'un droit de téléchargement
+-- ============================================================
+-- Les trois vérifications (payé / non expiré / quota) et l'incrément du
+-- compteur doivent être atomiques, sinon deux clics simultanés sur le lien
+-- passent tous les deux le contrôle de quota. Le verrou de ligne s'en charge.
+--
+-- Appelée uniquement par l'Edge Function `download` en service_role.
+create or replace function public.consume_download(p_token uuid)
+returns table (file_path text, file_name text, refusal text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order public.orders;
+begin
+  select * into v_order
+  from public.orders
+  where download_token = p_token
+  for update;
+
+  if not found then
+    return query select null::text, null::text, 'not_found'::text;
+    return;
+  end if;
+
+  if v_order.status <> 'paid' then
+    return query select null::text, null::text, 'not_paid'::text;
+    return;
+  end if;
+
+  if v_order.download_expires_at is null or v_order.download_expires_at < now() then
+    return query select null::text, null::text, 'expired'::text;
+    return;
+  end if;
+
+  if v_order.download_count >= v_order.max_downloads then
+    return query select null::text, null::text, 'exhausted'::text;
+    return;
+  end if;
+
+  update public.orders
+  set download_count = download_count + 1
+  where id = v_order.id;
+
+  return query
+  select p.file_path, p.file_name, null::text
+  from public.products p
+  where p.id = v_order.product_id;
+end;
+$$;
+
+revoke all on function public.consume_download(uuid) from public, anon, authenticated;
+grant execute on function public.consume_download(uuid) to service_role;

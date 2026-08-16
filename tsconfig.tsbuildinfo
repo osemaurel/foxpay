@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/components/ui.tsx","./src/lib/format.ts","./src/lib/supabase.ts","./src/lib/types.ts","./src/lib/upload.ts","./src/pages/Admin.tsx","./src/pages/Login.tsx","./src/pages/Return.tsx","./src/pages/Shop.tsx","./src/pages/admin/ProductForm.tsx","./src/pages/admin/Sales.tsx","./src/pages/admin/ShopForm.tsx"],"version":"5.9.3"}
