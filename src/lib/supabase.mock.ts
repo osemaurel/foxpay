@@ -92,10 +92,12 @@ const orders: Order[] = [
   updated_at: daysAgo(days as number),
 }))
 
-const TABLES: Record<string, unknown[]> = { shops: [shop], products: [product], orders }
+type Row = Record<string, unknown>
+
+const TABLES: Record<string, Row[]> = { shops: [shop], products: [product], orders }
 
 /** Constructeur de requête minimal : il accepte les chaînes utilisées par l'app. */
-function builder(rows: unknown[]) {
+function builder(rows: Row[]) {
   const chain = {
     select: () => chain,
     eq: () => chain,
