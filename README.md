@@ -14,8 +14,21 @@ Functions), paiement **pawaPay**, email de livraison **Resend**.
 - [x] Étape 4 — Paiement : `create-payment` + `pawapay-callback`
 - [x] Étape 5 — Livraison : `download` (URL signée) + email Resend
 - [x] Étape 6 — Suivi des ventes (admin)
+- [x] Étape 7 — Projet Supabase créé, migrations appliquées, fonctions déployées
+- [ ] **Renseigner les secrets des Edge Functions** — sans eux, rien ne tourne
 - [ ] **Vérifier le corps de la requête pawaPay** — voir « Point ouvert » plus bas
-- [ ] Appliquer la migration sur un projet Supabase
+
+## Projet Supabase
+
+| | |
+|---|---|
+| Référence | `vodgtcipxqkebronwbmu` |
+| Région | eu-west-3 (Paris) |
+| URL API | `https://vodgtcipxqkebronwbmu.supabase.co` |
+
+Déjà en place : les 3 tables avec RLS, les 2 buckets Storage, `consume_download()`,
+et les 4 Edge Functions en `verify_jwt = false`. Le linter de sécurité Supabase
+ne remonte aucun avertissement.
 
 ## Modèle de données
 
@@ -125,7 +138,10 @@ confirmation de paiement ne passe que par lui.
 
 ## Mise en route
 
-### 1. Base de données
+### 1. Base de données — déjà fait
+
+Les migrations ont été appliquées directement sur le projet. Pour repartir de
+zéro ailleurs :
 
 ```bash
 supabase link --project-ref <ref>
@@ -136,7 +152,7 @@ Crée le compte vendeur depuis la page `/login` (bouton « Créer un compte »),
 depuis le dashboard Supabase. Le premier passage sur `/admin` propose de créer la
 boutique.
 
-### 2. Secrets des Edge Functions
+### 2. Secrets des Edge Functions — à faire
 
 ```bash
 supabase secrets set \
@@ -150,14 +166,16 @@ supabase secrets set \
 `SITE_URL` doit être joignable depuis Internet : pawaPay refuse un `returnUrl`
 en `localhost`. Pour tester en local, passe par un tunnel (ngrok, cloudflared).
 
-### 3. Fonctions
+### 3. Fonctions — déjà déployées
+
+Les quatre tournent déjà. Pour republier après modification :
 
 ```bash
 supabase functions deploy create-payment pawapay-callback order-status download
 ```
 
 Puis, dans le dashboard pawaPay, pointe l'URL de callback des dépôts sur
-`https://<ref>.supabase.co/functions/v1/pawapay-callback`.
+`https://vodgtcipxqkebronwbmu.supabase.co/functions/v1/pawapay-callback`.
 
 Les quatre fonctions sont déclarées `verify_jwt = false` dans `config.toml` :
 elles sont appelées par des visiteurs non authentifiés (acheteur, serveurs
@@ -184,7 +202,10 @@ besoin d'être touché.
 
 ## Ce qui n'a pas été vérifié
 
-- Les Edge Functions n'ont pas été exécutées : Deno n'était pas disponible dans
-  l'environnement de développement, et aucun projet Supabase n'était rattaché.
-  Le front, lui, compile et build (`npm run build`).
-- Aucun paiement réel ni sandbox n'a été passé de bout en bout.
+- **Les Edge Functions n'ont jamais été exécutées.** Elles sont déployées et
+  actives, mais l'environnement de développement n'avait ni Deno ni accès
+  réseau à `*.supabase.co`, donc ni typecheck ni appel réel. Le premier
+  `create-payment` sera le premier test.
+- Aucun paiement, même en sandbox, n'a été passé de bout en bout.
+- L'email Resend n'a jamais été envoyé.
+- Le front, lui, compile et build (`npm run build`).
