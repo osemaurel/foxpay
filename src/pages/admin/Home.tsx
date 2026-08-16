@@ -7,7 +7,7 @@ import { Card } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
 export default function Home() {
-  const { shop, product } = useAdmin()
+  const { shop, products } = useAdmin()
   const [orders, setOrders] = useState<Order[] | null>(null)
 
   useEffect(() => {
@@ -26,12 +26,20 @@ export default function Home() {
   const steps = [
     { done: true, label: 'Boutique créée', to: '/admin/parametres' },
     {
-      done: Boolean(product?.title && product.price > 0),
-      label: 'Produit décrit et prix fixé',
-      to: '/admin/produit',
+      done: products.length > 0,
+      label: 'Premier produit créé',
+      to: '/admin/produits/nouveau',
     },
-    { done: Boolean(product?.file_path), label: 'Fichier à livrer envoyé', to: '/admin/produit' },
-    { done: Boolean(product?.is_active), label: 'Produit mis en vente', to: '/admin/produit' },
+    {
+      done: products.some((p) => p.file_path),
+      label: 'Fichier à livrer envoyé',
+      to: '/admin/produits',
+    },
+    {
+      done: products.some((p) => p.is_active),
+      label: 'Au moins un produit en vente',
+      to: '/admin/produits',
+    },
   ]
   const ready = steps.every((s) => s.done)
 
@@ -66,10 +74,14 @@ export default function Home() {
       )}
 
       <Card title="Tes chiffres">
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
           <Stat value={formatPrice(total)} label="Total encaissé" />
           <Stat value={String(paid.length)} label={paid.length > 1 ? 'ventes' : 'vente'} />
           <Stat value={String(pending.length)} label="paiements en attente" />
+          <Stat
+            value={String(products.filter((p) => p.is_active).length)}
+            label="produits en vente"
+          />
         </div>
         <Link
           to="/admin/ventes"

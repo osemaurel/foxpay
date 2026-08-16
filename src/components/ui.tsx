@@ -119,12 +119,15 @@ export function ImagePicker({
   url,
   onPick,
   disabled,
+  square,
 }: {
   label: string
   hint?: string
   url: string | null
   onPick: (file: File) => void
   disabled?: boolean
+  /** Aperçu cadré carré, comme la boutique affichera l'image. */
+  square?: boolean
 }) {
   return (
     <Field label={label} hint={hint}>
@@ -132,7 +135,11 @@ export function ImagePicker({
         <img
           src={url}
           alt=""
-          className="mb-3 h-24 w-full rounded-xl border border-line bg-canvas object-contain p-2"
+          className={
+            square
+              ? 'mb-3 aspect-square w-32 rounded-xl border border-line object-cover'
+              : 'mb-3 h-24 w-full rounded-xl border border-line bg-canvas object-contain p-2'
+          }
         />
       )}
       <input

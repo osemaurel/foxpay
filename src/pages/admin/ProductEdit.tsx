@@ -1,7 +1,10 @@
 import { lazy, Suspense, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { uploadProductFile, uploadPublicAsset } from '../../lib/upload'
 import { formatFileSize, formatPrice } from '../../lib/format'
+import { isEmptyHtml } from '../../lib/richText'
+import { slugify } from '../../lib/slug'
 import {
   Alert,
   Button,
@@ -11,7 +14,6 @@ import {
   ImagePicker,
   inputClass,
 } from '../../components/ui'
-import { isEmptyHtml } from '../../lib/richText'
 import { useAdmin } from './AdminLayout'
 
 // L'éditeur ne concerne que le vendeur : il ne doit pas alourdir le bundle
@@ -20,6 +22,7 @@ const RichTextEditor = lazy(() => import('../../components/RichTextEditor'))
 
 const EMPTY = {
   title: '',
+  slug: '',
   description: '' as string | null,
   price: 0,
   cover_url: null as string | null,
@@ -27,14 +30,41 @@ const EMPTY = {
   file_name: null as string | null,
   file_size: null as number | null,
   is_active: false,
+  position: 0,
 }
 
-export default function ProductPage() {
-  const { shop, product, onProductSaved } = useAdmin()
-  const [form, setForm] = useState({ ...EMPTY, ...(product ?? {}) })
+export default function ProductEdit() {
+  const { productId } = useParams<{ productId: string }>()
+  const { shop, products, reloadProducts } = useAdmin()
+  const navigate = useNavigate()
+
+  const existing = products.find((p) => p.id === productId) ?? null
+  const isNew = !productId || productId === 'nouveau'
+
+  const [form, setForm] = useState({
+    ...EMPTY,
+    ...(existing ?? {}),
+    position: existing?.position ?? products.length,
+  })
+  // Le lien suit le titre tant que le produit n'est pas enregistré ; ensuite on
+  // ne le touche plus tout seul, sinon un partage déjà fait cesserait de marcher.
+  const [slugLocked, setSlugLocked] = useState(!isNew)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+
+  if (!isNew && !existing) {
+    return (
+      <Card title="Produit introuvable">
+        <p className="text-sm text-ink-muted">
+          Ce produit n'existe plus.{' '}
+          <Link to="/admin/produits" className="underline">
+            Retour au catalogue
+          </Link>
+        </p>
+      </Card>
+    )
+  }
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -78,25 +108,39 @@ export default function ProductPage() {
     const payload = {
       shop_id: shop.id,
       title: form.title,
-      description: form.description && !isEmptyHtml(form.description) ? form.description : null,
+      slug: form.slug || slugify(form.title) || 'produit',
+      description:
+        form.description && !isEmptyHtml(form.description) ? form.description : null,
       price: form.price,
       cover_url: form.cover_url,
       file_path: form.file_path,
       file_name: form.file_name,
       file_size: form.file_size,
       is_active: form.is_active,
+      position: form.position,
     }
 
-    const { data, error } = product
-      ? await supabase.from('products').update(payload).eq('id', product.id).select().single()
+    const { data, error } = existing
+      ? await supabase.from('products').update(payload).eq('id', existing.id).select().single()
       : await supabase.from('products').insert(payload).select().single()
 
-    if (error) setError(error.message)
-    else {
-      onProductSaved(data)
-      setSaved(true)
+    if (error) {
+      setError(
+        error.code === '23505'
+          ? 'Un autre produit de ta boutique utilise déjà ce lien. Change-le.'
+          : error.message,
+      )
+      setBusy(false)
+      return
     }
+
+    await reloadProducts()
     setBusy(false)
+    if (existing) {
+      setSaved(true)
+    } else {
+      navigate(`/admin/produits/${data.id}`, { replace: true })
+    }
   }
 
   // Sans fichier, il n'y a rien à livrer : on empêche la mise en vente.
@@ -104,13 +148,50 @@ export default function ProductPage() {
 
   return (
     <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          to="/admin/produits"
+          className="text-sm text-ink-faint transition hover:text-ink"
+        >
+          ← Catalogue
+        </Link>
+        {existing && existing.is_active && (
+          <a
+            href={`/boutique/${shop.slug}/p/${existing.slug}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-ink-faint transition hover:text-ink"
+          >
+            Voir la page publique ↗
+          </a>
+        )}
+      </div>
+
       <Card title="Ce que tu vends">
         <form id="product-form" onSubmit={save} className="space-y-4">
           <Field label="Titre">
             <input
               required
               value={form.title}
-              onChange={(e) => set('title', e.target.value)}
+              onChange={(e) => {
+                set('title', e.target.value)
+                if (!slugLocked) set('slug', slugify(e.target.value))
+              }}
+              className={inputClass}
+            />
+          </Field>
+
+          <Field
+            label="Lien du produit"
+            hint={`/boutique/${shop.slug}/p/${form.slug || '…'}`}
+          >
+            <input
+              required
+              value={form.slug}
+              onChange={(e) => {
+                setSlugLocked(true)
+                set('slug', slugify(e.target.value))
+              }}
               className={inputClass}
             />
           </Field>
@@ -145,8 +226,9 @@ export default function ProductPage() {
           </Field>
 
           <ImagePicker
-            label="Image de couverture"
-            hint="Format paysage conseillé."
+            label="Image du produit"
+            hint="Elle est affichée en carré, partout. Envoie une image carrée pour éviter un recadrage surprise."
+            square
             url={form.cover_url}
             onPick={pickCover}
             disabled={busy}
@@ -193,10 +275,10 @@ export default function ProductPage() {
             className="mt-1 h-4 w-4"
           />
           <span className="text-sm">
-            <span className="font-medium text-ink">Afficher le produit sur la boutique</span>
+            <span className="font-medium text-ink">Afficher ce produit sur la boutique</span>
             <span className="block text-ink-faint">
               {canPublish
-                ? 'Décoche pour retirer la vente sans supprimer le produit.'
+                ? 'Décoche pour le retirer de la vente sans le supprimer.'
                 : 'Il faut un titre, un prix supérieur à zéro et un fichier avant de pouvoir vendre.'}
             </span>
           </span>
@@ -206,7 +288,7 @@ export default function ProductPage() {
           {error && <Alert kind="error">{error}</Alert>}
           {saved && <Alert kind="ok">Produit enregistré.</Alert>}
           <Button type="submit" form="product-form" disabled={busy}>
-            {busy ? '…' : 'Enregistrer'}
+            {busy ? '…' : existing ? 'Enregistrer' : 'Créer le produit'}
           </Button>
         </div>
       </Card>

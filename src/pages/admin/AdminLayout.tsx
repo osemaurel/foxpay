@@ -9,9 +9,9 @@ import ThemeToggle from '../../components/ThemeToggle'
 
 export type AdminContext = {
   shop: Shop
-  product: Product | null
+  products: Product[]
+  reloadProducts: () => Promise<void>
   onShopSaved: (shop: Shop) => void
-  onProductSaved: (product: Product) => void
 }
 
 /** Accès au contexte depuis les pages enfants. */
@@ -21,15 +21,25 @@ export function useAdmin() {
 
 const TABS = [
   { to: '/admin', label: 'Accueil', end: true },
-  { to: '/admin/produit', label: 'Produit', end: false },
+  { to: '/admin/produits', label: 'Produits', end: false },
   { to: '/admin/ventes', label: 'Ventes', end: false },
   { to: '/admin/parametres', label: 'Paramètres', end: false },
 ]
 
 export default function AdminLayout({ session }: { session: Session }) {
   const [shop, setShop] = useState<Shop | null>(null)
-  const [product, setProduct] = useState<Product | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+
+  const loadProducts = useCallback(async (shopId: string) => {
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .eq('shop_id', shopId)
+      .order('position')
+      .order('created_at')
+    setProducts(data ?? [])
+  }, [])
 
   const load = useCallback(async () => {
     const { data: shopRow } = await supabase
@@ -39,17 +49,9 @@ export default function AdminLayout({ session }: { session: Session }) {
       .maybeSingle()
 
     setShop(shopRow)
-
-    if (shopRow) {
-      const { data: productRow } = await supabase
-        .from('products')
-        .select('*')
-        .eq('shop_id', shopRow.id)
-        .maybeSingle()
-      setProduct(productRow)
-    }
+    if (shopRow) await loadProducts(shopRow.id)
     setLoading(false)
-  }, [session.user.id])
+  }, [session.user.id, loadProducts])
 
   useEffect(() => {
     void load()
@@ -70,9 +72,9 @@ export default function AdminLayout({ session }: { session: Session }) {
 
   const context: AdminContext = {
     shop,
-    product,
+    products,
+    reloadProducts: () => loadProducts(shop.id),
     onShopSaved: setShop,
-    onProductSaved: setProduct,
   }
 
   return (

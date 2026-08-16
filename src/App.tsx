@@ -5,11 +5,14 @@ import { missingEnv, supabase } from './lib/supabase'
 import { Spinner } from './components/ui'
 import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
-import Shop from './pages/Shop'
 import Return from './pages/Return'
+import ShopLayout from './pages/shop/ShopLayout'
+import ShopHome from './pages/shop/ShopHome'
+import ProductPage from './pages/shop/ProductPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import Home from './pages/admin/Home'
-import ProductPage from './pages/admin/ProductPage'
+import ProductsList from './pages/admin/ProductsList'
+import ProductEdit from './pages/admin/ProductEdit'
 import SalesPage from './pages/admin/SalesPage'
 import SettingsPage from './pages/admin/SettingsPage'
 
@@ -32,16 +35,24 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/boutique/:slug" element={<Shop />} />
+        {/* Boutique publique */}
+        <Route path="/boutique/:slug" element={<ShopLayout />}>
+          <Route index element={<ShopHome />} />
+          <Route path="p/:productSlug" element={<ProductPage />} />
+        </Route>
         <Route path="/boutique/:slug/retour" element={<Return />} />
+
         <Route path="/login" element={session ? <Navigate to="/admin" replace /> : <Login />} />
 
+        {/* Administration */}
         <Route
           path="/admin"
           element={session ? <AdminLayout session={session} /> : <Navigate to="/login" replace />}
         >
           <Route index element={<Home />} />
-          <Route path="produit" element={<ProductPage />} />
+          <Route path="produits" element={<ProductsList />} />
+          <Route path="produits/nouveau" element={<ProductEdit />} />
+          <Route path="produits/:productId" element={<ProductEdit />} />
           <Route path="ventes" element={<SalesPage />} />
           <Route path="parametres" element={<SettingsPage />} />
         </Route>

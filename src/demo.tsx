@@ -2,12 +2,15 @@ import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import Shop from './pages/Shop'
+import ShopLayout from './pages/shop/ShopLayout'
+import ShopHome from './pages/shop/ShopHome'
+import ShopProductPage from './pages/shop/ProductPage'
 import Login from './pages/Login'
 import Return from './pages/Return'
 import AdminLayout from './pages/admin/AdminLayout'
 import Home from './pages/admin/Home'
-import ProductPage from './pages/admin/ProductPage'
+import ProductsList from './pages/admin/ProductsList'
+import ProductEdit from './pages/admin/ProductEdit'
 import SalesPage from './pages/admin/SalesPage'
 import SettingsPage from './pages/admin/SettingsPage'
 import '@fontsource-variable/inter'
@@ -20,11 +23,14 @@ const SCREENS = [
   {
     id: 'shop',
     label: 'Page boutique',
-    note: 'Ce que voit un acheteur sur /boutique/atelier-kodi. Le bouton « Acheter » ouvre le formulaire.',
+    note: 'Le catalogue. Clique sur un produit pour ouvrir sa page — les images sont cadrées en carré.',
     render: () => (
       <MemoryRouter initialEntries={['/boutique/atelier-kodi']}>
         <Routes>
-          <Route path="/boutique/:slug" element={<Shop />} />
+          <Route path="/boutique/:slug" element={<ShopLayout />}>
+            <Route index element={<ShopHome />} />
+            <Route path="p/:productSlug" element={<ShopProductPage />} />
+          </Route>
         </Routes>
       </MemoryRouter>
     ),
@@ -38,7 +44,9 @@ const SCREENS = [
         <Routes>
           <Route path="/admin" element={<AdminLayout session={session} />}>
             <Route index element={<Home />} />
-            <Route path="produit" element={<ProductPage />} />
+            <Route path="produits" element={<ProductsList />} />
+            <Route path="produits/nouveau" element={<ProductEdit />} />
+            <Route path="produits/:productId" element={<ProductEdit />} />
             <Route path="ventes" element={<SalesPage />} />
             <Route path="parametres" element={<SettingsPage />} />
           </Route>

@@ -16,6 +16,9 @@ export type Shop = {
 export type Product = {
   id: string
   shop_id: string
+  slug: string
+  /** Ordre d'affichage sur la page boutique. */
+  position: number
   title: string
   description: string | null
   price: number
