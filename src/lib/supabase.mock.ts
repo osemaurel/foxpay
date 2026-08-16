@@ -8,6 +8,9 @@
  */
 import type { Order, Product, Shop } from './types'
 
+/** La preview n'a rien à configurer. */
+export const missingEnv: string[] = []
+
 const svg = (markup: string) => `data:image/svg+xml,${encodeURIComponent(markup)}`
 
 const LOGO = svg(

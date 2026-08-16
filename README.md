@@ -194,6 +194,16 @@ est côté client, il faut donc rediriger toutes les routes vers `index.html` �
 `vercel.json` le fait pour Vercel ; sur Netlify, un fichier `_redirects`
 contenant `/*  /index.html  200`.
 
+**Les deux variables `VITE_` doivent exister avant le build.** Vite les remplace
+par leur valeur pendant la compilation : les ajouter à l'hébergeur sans relancer
+un déploiement ne change rien. Si elles manquent, l'app affiche un écran
+« Configuration incomplète » qui les nomme, plutôt qu'une page blanche.
+
+Piège sur Vercel : l'intégration Supabase injecte des variables nommées
+`SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_…`. Vite ne lit que les noms préfixés
+`VITE_`, il faut donc ajouter les deux à la main même si des variables Supabase
+apparaissent déjà dans le projet.
+
 ## Dupliquer la boutique
 
 La v1 est pensée pour être redéployée plutôt que rendue multi-tenant : nouveau

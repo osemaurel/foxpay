@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from './lib/supabase'
+import { missingEnv, supabase } from './lib/supabase'
 import { Spinner } from './components/ui'
+import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Shop from './pages/Shop'
@@ -21,6 +22,7 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  if (missingEnv.length > 0) return <ConfigError missing={missingEnv} />
   if (!ready) return <Spinner />
 
   return (
