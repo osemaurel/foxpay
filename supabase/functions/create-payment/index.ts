@@ -1,6 +1,6 @@
 import { admin, SITE_URL } from '../_shared/admin.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
-import { createCheckout } from '../_shared/pawapay.ts'
+import { createCheckout, type ShopCurrency } from '../_shared/pawapay.ts'
 
 type Body = {
   slug?: string
@@ -76,6 +76,13 @@ Deno.serve(async (req) => {
 
   if (orderError) return fail(`Création de la commande impossible : ${orderError.message}`, 500)
 
+  // Devises hors zone CFA configurées par le vendeur (RDC : CDF ou USD).
+  const { data: extras } = await admin
+    .from('shop_currencies')
+    .select('currency, rate, decimals, round_to')
+    .eq('shop_id', shop.id)
+    .eq('is_active', true)
+
   try {
     // pawaPay ajoute le checkoutCode à cette URL au retour de l'acheteur ;
     // c'est par lui qu'on retrouvera la commande.
@@ -85,6 +92,7 @@ Deno.serve(async (req) => {
       returnUrl: `${SITE_URL()}/boutique/${shop.slug}/retour`,
       reason: item.title,
       msisdn: order.buyer_phone,
+      extraCurrencies: (extras ?? []) as ShopCurrency[],
     })
 
     await admin

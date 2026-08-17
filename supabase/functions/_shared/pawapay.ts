@@ -41,13 +41,58 @@ export const CFA_ZONE = [
   { country: 'GAB', currency: 'XAF' },
 ] as const
 
-/** Un montant par pays : l'acheteur choisit son pays, la page affiche le sien. */
-export function cfaAmounts(amount: number) {
-  return CFA_ZONE.map(({ country, currency }) => ({
+/**
+ * Pays atteignables avec une devise hors zone CFA. La RDC est le seul pays de
+ * la plateforme qui accepte l'USD, sur ses trois opérateurs.
+ */
+export const EXTRA_CURRENCY_COUNTRIES: Record<string, string[]> = {
+  CDF: ['COD'],
+  USD: ['COD'],
+}
+
+export type ShopCurrency = {
+  currency: string
+  rate: number
+  decimals: number
+  round_to: number
+}
+
+/**
+ * Convertit le prix de référence vers une devise, avec un arrondi commercial :
+ * 66 123 CDF devient 66 100 plutôt que d'afficher un montant au franc près,
+ * qui a l'air d'une erreur sur une page de paiement.
+ */
+export function convertPrice(price: number, config: ShopCurrency): string {
+  const raw = price * config.rate
+
+  if (config.decimals > 0) return raw.toFixed(config.decimals)
+
+  const step = Math.max(1, Math.round(config.round_to))
+  // Jamais zéro : un montant nul serait refusé par pawaPay, et gratuit.
+  return String(Math.max(step, Math.round(raw / step) * step))
+}
+
+/**
+ * Un montant par (pays, devise). L'acheteur choisit son pays sur la page, et
+ * pawaPay affiche le montant correspondant — il ne convertit jamais lui-même.
+ */
+export function buildAmounts(price: number, extras: ShopCurrency[] = []) {
+  const amounts = CFA_ZONE.map(({ country, currency }) => ({
     country,
     currency,
-    amount: String(amount),
+    amount: String(price),
   }))
+
+  for (const config of extras) {
+    const countries = EXTRA_CURRENCY_COUNTRIES[config.currency]
+    if (!countries) continue
+    const amount = convertPrice(price, config)
+    for (const country of countries) {
+      amounts.push({ country, currency: config.currency, amount })
+    }
+  }
+
+  return amounts
 }
 
 /**
@@ -81,6 +126,7 @@ export async function createCheckout(input: {
   returnUrl: string
   reason: string
   msisdn?: string | null
+  extraCurrencies?: ShopCurrency[]
 }): Promise<CheckoutCreated> {
   const reason = sanitizeReason(input.reason)
 
@@ -89,7 +135,7 @@ export async function createCheckout(input: {
     returnUrl: input.returnUrl,
     returnMethod: 'INSTANT',
     defaultLanguage: 'fr',
-    amounts: cfaAmounts(input.amount),
+    amounts: buildAmounts(input.amount, input.extraCurrencies ?? []),
     reason: { fr: reason, en: reason },
     // Entre 3 et 60 minutes. 30 laisse le temps de chercher son téléphone sans
     // laisser une commande en attente toute la journée.

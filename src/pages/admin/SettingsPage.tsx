@@ -4,6 +4,7 @@ import { uploadPublicAsset } from '../../lib/upload'
 import { slugify } from '../../lib/slug'
 import type { Shop } from '../../lib/types'
 import { Alert, Button, Card, Field, ImagePicker, inputClass } from '../../components/ui'
+import CurrenciesEditor from './CurrenciesEditor'
 import { useAdmin } from './AdminLayout'
 
 export default function SettingsPage() {
@@ -60,7 +61,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <form onSubmit={save} className="space-y-6">
+    <>
+      <form onSubmit={save} className="space-y-6">
       <Card title="Identité">
         <div className="space-y-4">
           <Field label="Nom de la boutique">
@@ -156,12 +158,15 @@ export default function SettingsPage() {
       </Card>
 
       <div className="space-y-4">
-        {error && <Alert kind="error">{error}</Alert>}
-        {saved && <Alert kind="ok">Paramètres enregistrés.</Alert>}
-        <Button type="submit" disabled={busy}>
-          {busy ? '…' : 'Enregistrer'}
-        </Button>
-      </div>
-    </form>
+          {error && <Alert kind="error">{error}</Alert>}
+          {saved && <Alert kind="ok">Paramètres enregistrés.</Alert>}
+          <Button type="submit" disabled={busy}>
+            {busy ? '…' : 'Enregistrer'}
+          </Button>
+        </div>
+      </form>
+
+      <CurrenciesEditor />
+    </>
   )
 }
