@@ -281,6 +281,13 @@ const PAYS = [
   ['COD', 'République démocratique du Congo', '243', 'CDF', 4.042129, ['Vodacom', 'Airtel', 'Orange']],
 ] as const
 
+/** Même calcul que le serveur : 3 % ajoutés, arrondis au supérieur. */
+const avecFrais = (prix: number) => Math.ceil(prix * 1.03)
+
+/** Le franc CFA prend le prix tel quel ; une devise convertie s'arrondit à la centaine. */
+const convertir = (prix: number, taux: number) =>
+  taux === 1 ? prix : Math.round((prix * taux) / 100) * 100
+
 function paymentOptions(product: Product) {
   const price = product.price
   return {
@@ -292,17 +299,16 @@ function paymentOptions(product: Product) {
       prefix,
       flag: null,
       currency,
-      compare_amount:
-        taux === 1 || !product.compare_at_price
-          ? null
-          : String(Math.round((product.compare_at_price * taux) / 100) * 100),
+      base_amount: String(convertir(price, taux)),
+      fee_amount: String(convertir(avecFrais(price), taux) - convertir(price, taux)),
+      compare_amount: !product.compare_at_price
+        ? null
+        : String(convertir(product.compare_at_price, taux)),
       providers: operateurs.map((operateur) => ({
         provider: `${operateur.toUpperCase()}_${country}`,
         name: operateur,
         logo: null,
-        // Le franc CFA prend le prix tel quel ; une devise convertie est
-        // arrondie à la centaine, comme le fait le serveur.
-        amount: String(taux === 1 ? price : Math.round((price * taux) / 100) * 100),
+        amount: String(convertir(avecFrais(price), taux)),
         auth_type: 'PROVIDER_AUTH',
         pin_prompt: 'AUTOMATIC',
         pin_prompt_revivable: false,

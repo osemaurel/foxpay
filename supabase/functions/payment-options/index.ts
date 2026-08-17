@@ -6,6 +6,7 @@ import {
   getActiveConf,
   priceForCountry,
   type ShopCurrency,
+  withFee,
 } from '../_shared/pawapay.ts'
 
 /**
@@ -70,13 +71,17 @@ Deno.serve(async (req) => {
 
   if (!confResult) return fail('Les moyens de paiement sont momentanément indisponibles.', 502)
   const conf = confResult
-  const extras = extrasResult.data
+  const extras = (extrasResult.data ?? []) as ShopCurrency[]
 
   const countries = []
 
   for (const country of conf) {
-    const priced = priceForCountry(country.country, product.price, (extras ?? []) as ShopCurrency[])
-    if (!priced) continue
+    // Deux passages dans la même conversion : le prix seul, puis le prix majoré
+    // des frais. Les frais sont la différence des deux, donc l'addition affichée
+    // à l'acheteur tombe juste même après arrondi.
+    const base = priceForCountry(country.country, product.price, extras)
+    const priced = priceForCountry(country.country, withFee(product.price), extras)
+    if (!base || !priced) continue
 
     const retenus = country.providers.filter(
       (p) => p.currency === priced.currency && p.deposit.status !== 'CLOSED',
@@ -98,12 +103,14 @@ Deno.serve(async (req) => {
       }))
 
     if (providers.length > 0) {
-      // Le prix barré suit la même conversion que le total : afficher
-      // « 20 000 FCFA » au-dessus d'un total en francs congolais mélangerait
-      // deux monnaies dans le même récapitulatif.
+      // Le prix barré suit la même conversion que le total — sans quoi le
+      // récapitulatif mélangerait deux monnaies — mais pas les frais : ceux-ci
+      // ont leur propre ligne, et seraient sinon comptés deux fois.
       const compare = product.compare_at_price
-        ? priceForCountry(country.country, product.compare_at_price, (extras ?? []) as ShopCurrency[])
+        ? priceForCountry(country.country, product.compare_at_price, extras)
         : null
+
+      const decimales = retenus[0].deposit.decimalsInAmount
 
       countries.push({
         country: country.country,
@@ -111,9 +118,10 @@ Deno.serve(async (req) => {
         prefix: country.prefix,
         flag: country.flag,
         currency: priced.currency,
-        compare_amount: compare
-          ? formatAmount(compare.amount, retenus[0].deposit.decimalsInAmount)
-          : null,
+        // Le récapitulatif détaille le total : le prix, puis les frais.
+        base_amount: formatAmount(base.amount, decimales),
+        fee_amount: formatAmount(priced.amount - base.amount, decimales),
+        compare_amount: compare ? formatAmount(compare.amount, decimales) : null,
         providers,
       })
     }

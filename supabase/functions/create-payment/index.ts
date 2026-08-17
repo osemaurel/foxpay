@@ -9,6 +9,7 @@ import {
   predictProvider,
   priceForCountry,
   type ShopCurrency,
+  withFee,
 } from '../_shared/pawapay.ts'
 
 type Body = {
@@ -105,7 +106,9 @@ Deno.serve(async (req) => {
     .eq('shop_id', shop.id)
     .eq('is_active', true)
 
-  const priced = priceForCountry(country, item.price, (extras ?? []) as ShopCurrency[])
+  // Le montant réellement débité inclut les frais de paiement, exactement comme
+  // la page l'a annoncé à l'acheteur : le même calcul des deux côtés.
+  const priced = priceForCountry(country, withFee(item.price), (extras ?? []) as ShopCurrency[])
   if (!priced || priced.currency !== providerConf.currency) {
     return fail("Ce produit n'est pas en vente dans ce pays", 400)
   }

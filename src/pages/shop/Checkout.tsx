@@ -31,6 +31,10 @@ type CountryOption = {
   prefix: string
   flag: string | null
   currency: string
+  /** Le prix seul, sans les frais de paiement. */
+  base_amount: string
+  /** Les frais de paiement, dans la devise du pays. */
+  fee_amount: string
   /** Prix barré, converti dans la devise du pays. */
   compare_amount: string | null
   providers: ProviderOption[]
@@ -491,6 +495,8 @@ export default function Checkout() {
               payable && country
                 ? {
                     amount: payable,
+                    base: country.base_amount,
+                    fee: country.fee_amount,
                     compare: country.compare_amount,
                     currency: country.currency,
                   }
@@ -665,7 +671,13 @@ function Summary({
 }: {
   product: Product
   accent: string
-  charged: { amount: string; compare: string | null; currency: string } | null
+  charged: {
+    amount: string
+    base: string
+    fee: string
+    compare: string | null
+    currency: string
+  } | null
 }) {
   const discount =
     product.compare_at_price && product.compare_at_price > product.price
@@ -688,6 +700,14 @@ function Summary({
       </div>
 
       <div className="mt-5 space-y-2 border-t border-line-soft pt-4 text-sm">
+        {charged && (
+          <div className="flex items-center justify-between text-ink-muted">
+            <span>Le produit</span>
+            <span className="tabular-nums">
+              {formatCharged(charged.base, charged.currency)}
+            </span>
+          </div>
+        )}
         {product.compare_at_price && (
           <div className="flex items-center justify-between text-ink-faint">
             <span>Prix habituel</span>
@@ -702,6 +722,14 @@ function Summary({
           <div className="flex items-center justify-between text-go">
             <span>Remise</span>
             <span className="tabular-nums">−{discount} %</span>
+          </div>
+        )}
+        {charged && (
+          <div className="flex items-center justify-between text-ink-muted">
+            <span>Frais de paiement</span>
+            <span className="tabular-nums">
+              + {formatCharged(charged.fee, charged.currency)}
+            </span>
           </div>
         )}
         <div className="flex items-baseline justify-between pt-1">

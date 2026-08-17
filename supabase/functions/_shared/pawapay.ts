@@ -47,6 +47,24 @@ export const EXTRA_CURRENCY_COUNTRIES: Record<string, string[]> = {
   USD: ['COD'],
 }
 
+/**
+ * pawaPay prélève une commission sur chaque encaissement. Ce taux la reporte
+ * sur l'acheteur, pour que le vendeur touche le prix qu'il a affiché.
+ *
+ * Il s'applique au prix de référence, avant conversion : le montant congolais
+ * garde ainsi ses arrondis commerciaux au lieu de tomber sur un chiffre bancal.
+ */
+export const PAYMENT_FEE_RATE = 0.03
+
+/**
+ * Prix majoré des frais, arrondi au supérieur. Jamais de virgule — les
+ * opérateurs mobile money de la zone franc CFA refusent les décimales, et
+ * arrondir vers le bas ferait perdre un franc au vendeur à chaque vente.
+ */
+export function withFee(price: number): number {
+  return Math.ceil(price * (1 + PAYMENT_FEE_RATE))
+}
+
 export type ShopCurrency = {
   currency: string
   rate: number

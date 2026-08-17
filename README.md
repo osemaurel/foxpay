@@ -152,6 +152,20 @@ fichier.
 | `PREAUTH` | Un champ pour le code à usage unique, précédé des instructions pour le générer. Envoyé comme `preAuthorisationCode`. |
 | `REDIRECT_AUTH` | Le seul cas où l'acheteur quitte la page : Wave impose son propre écran. `order-status` renvoie l'`authorizationUrl` dès que pawaPay la publie, et `successfulUrl` / `failedUrl` le ramènent sur sa page de paiement. |
 
+### Les frais de paiement
+
+pawaPay prélève une commission sur chaque encaissement. `PAYMENT_FEE_RATE`
+(3 %, dans `_shared/pawapay.ts`) la reporte sur l'acheteur, pour que le vendeur
+touche le prix qu'il a affiché. Le taux s'applique au prix de référence **avant**
+conversion, arrondi au supérieur : pas de décimales, et le montant congolais
+garde ses arrondis à la centaine au lieu de tomber sur un chiffre bancal.
+
+Le récapitulatif détaille toujours le total — le produit, puis les frais — et
+les deux montants viennent du même calcul que celui envoyé à pawaPay, si bien
+que l'addition affichée tombe juste même après arrondi. Le prix barré, lui,
+reste le prix habituel du produit : les frais ont leur propre ligne et seraient
+sinon comptés deux fois.
+
 ### Ce qui n'est jamais cru sur parole
 
 Le navigateur envoie un pays, un opérateur et un numéro — pas un montant.
