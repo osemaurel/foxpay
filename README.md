@@ -129,6 +129,14 @@ create-payment
                           consume_download() → URL signée 60 s
 ```
 
+À l'ouverture, `payment-options` devine aussi le pays de l'acheteur d'après son
+IP (`ipwho.is`, avec `api.country.is` en secours) et le présélectionne : son
+indicatif et ses opérateurs sont affichés d'entrée, sans un clic. C'est une
+avance, jamais une décision — le champ reste modifiable, un acheteur détecté
+hors des pays vendables n'est simplement pas présélectionné, et une panne des
+deux services laisse la page se comporter comme avant. La détection tourne en
+parallèle du reste (≈30 ms) et l'IP n'est stockée nulle part.
+
 Les deux chemins de confirmation (polling de la page et callback serveur)
 passent par la même fonction `settleOrder()`. Le polling n'est pas un luxe : un
 callback peut être retardé, mal configuré ou perdu, et l'acheteur attend son

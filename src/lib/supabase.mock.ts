@@ -281,6 +281,8 @@ const PAYS = [
 
 function paymentOptions(price: number) {
   return {
+    // Sur la vraie boutique, ce pays est deviné d'après l'IP de l'acheteur.
+    detected: 'CIV',
     countries: PAYS.map(([country, name, prefix, currency, operateurs]) => ({
       country,
       name,

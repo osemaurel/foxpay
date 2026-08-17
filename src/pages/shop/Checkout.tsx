@@ -64,6 +64,7 @@ export default function Checkout() {
 
   const [countries, setCountries] = useState<CountryOption[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [autoDetected, setAutoDetected] = useState(false)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -90,11 +91,23 @@ export default function Checkout() {
 
   useEffect(() => {
     let cancelled = false
-    callFunction<{ countries: CountryOption[] }>('payment-options', {
+    callFunction<{ countries: CountryOption[]; detected: string | null }>('payment-options', {
       slug: shop.slug,
       product_slug: productSlug,
     })
-      .then((data) => !cancelled && setCountries(data.countries))
+      .then((data) => {
+        if (cancelled) return
+        setCountries(data.countries)
+
+        // Le pays deviné d'après l'IP ouvre la page déjà remplie : l'indicatif
+        // et les opérateurs sont là sans un clic. C'est une avance, pas une
+        // décision — le champ reste modifiable, et un acheteur en voyage ou
+        // derrière un VPN n'a qu'à choisir le sien.
+        if (data.detected && data.countries.some((c) => c.country === data.detected)) {
+          setCountryCode(data.detected)
+          setAutoDetected(true)
+        }
+      })
       .catch((e) => !cancelled && setLoadError((e as Error).message))
     return () => {
       cancelled = true
@@ -333,7 +346,10 @@ export default function Checkout() {
 
               {countries && countries.length > 0 && (
                 <>
-                  <Field label="Ton pays">
+                  <Field
+                    label="Ton pays"
+                    hint={autoDetected ? 'Détecté automatiquement. Change-le si ce n’est pas le bon.' : undefined}
+                  >
                     <select
                       required
                       value={countryCode}
@@ -341,6 +357,7 @@ export default function Checkout() {
                         setCountryCode(e.target.value)
                         setProviderCode('')
                         setTouchedProvider(false)
+                        setAutoDetected(false)
                       }}
                       className={inputClass}
                     >
