@@ -31,6 +31,8 @@ type CountryOption = {
   prefix: string
   flag: string | null
   currency: string
+  /** Prix barré, converti dans la devise du pays. */
+  compare_amount: string | null
   providers: ProviderOption[]
 }
 
@@ -221,7 +223,10 @@ export default function Checkout() {
   }
 
   const accent = product.cta_color ?? 'var(--accent)'
-  const payable = provider?.amount ?? null
+  // Le montant suit le pays dès qu'il est choisi, sans attendre l'opérateur :
+  // un acheteur congolais doit voir son prix en francs congolais tout de suite.
+  // Les opérateurs d'un même pays demandent le même montant, à l'arrondi près.
+  const payable = provider?.amount ?? country?.providers[0]?.amount ?? null
 
   async function pay(e: React.FormEvent) {
     e.preventDefault()
@@ -482,7 +487,15 @@ export default function Checkout() {
           <Summary
             product={product}
             accent={accent}
-            charged={payable && country ? { amount: payable, currency: country.currency } : null}
+            charged={
+              payable && country
+                ? {
+                    amount: payable,
+                    compare: country.compare_amount,
+                    currency: country.currency,
+                  }
+                : null
+            }
           />
         </aside>
       </div>
@@ -652,7 +665,7 @@ function Summary({
 }: {
   product: Product
   accent: string
-  charged: { amount: string; currency: string } | null
+  charged: { amount: string; compare: string | null; currency: string } | null
 }) {
   const discount =
     product.compare_at_price && product.compare_at_price > product.price
@@ -679,7 +692,9 @@ function Summary({
           <div className="flex items-center justify-between text-ink-faint">
             <span>Prix habituel</span>
             <span className="tabular-nums line-through">
-              {formatPrice(product.compare_at_price, product.currency)}
+              {charged?.compare
+                ? formatCharged(charged.compare, charged.currency)
+                : formatPrice(product.compare_at_price, product.currency)}
             </span>
           </div>
         )}

@@ -273,27 +273,36 @@ export const supabase = {
  * activés, pays par pays.
  */
 const PAYS = [
-  ['CIV', "Côte d'Ivoire", '225', 'XOF', ['Orange', 'MTN', 'Moov', 'Wave']],
-  ['SEN', 'Sénégal', '221', 'XOF', ['Orange', 'Free', 'Wave']],
-  ['BEN', 'Bénin', '229', 'XOF', ['MTN', 'Moov']],
-  ['CMR', 'Cameroun', '237', 'XAF', ['MTN', 'Orange']],
+  ['CIV', "Côte d'Ivoire", '225', 'XOF', 1, ['Orange', 'MTN', 'Moov', 'Wave']],
+  ['SEN', 'Sénégal', '221', 'XOF', 1, ['Orange', 'Free', 'Wave']],
+  ['BEN', 'Bénin', '229', 'XOF', 1, ['MTN', 'Moov']],
+  ['CMR', 'Cameroun', '237', 'XAF', 1, ['MTN', 'Orange']],
+  // La RDC a sa propre monnaie : le prix y est converti au taux de la boutique.
+  ['COD', 'République démocratique du Congo', '243', 'CDF', 4.042129, ['Vodacom', 'Airtel', 'Orange']],
 ] as const
 
-function paymentOptions(price: number) {
+function paymentOptions(product: Product) {
+  const price = product.price
   return {
     // Sur la vraie boutique, ce pays est deviné d'après l'IP de l'acheteur.
     detected: 'CIV',
-    countries: PAYS.map(([country, name, prefix, currency, operateurs]) => ({
+    countries: PAYS.map(([country, name, prefix, currency, taux, operateurs]) => ({
       country,
       name,
       prefix,
       flag: null,
       currency,
+      compare_amount:
+        taux === 1 || !product.compare_at_price
+          ? null
+          : String(Math.round((product.compare_at_price * taux) / 100) * 100),
       providers: operateurs.map((operateur) => ({
         provider: `${operateur.toUpperCase()}_${country}`,
         name: operateur,
         logo: null,
-        amount: String(price),
+        // Le franc CFA prend le prix tel quel ; une devise convertie est
+        // arrondie à la centaine, comme le fait le serveur.
+        amount: String(taux === 1 ? price : Math.round((price * taux) / 100) * 100),
         auth_type: 'PROVIDER_AUTH',
         pin_prompt: 'AUTOMATIC',
         pin_prompt_revivable: false,
@@ -313,7 +322,7 @@ export async function callFunction<T>(name: string, body?: unknown): Promise<T> 
 
   if (name === 'payment-options') {
     const product = products.find((p) => p.slug === params.product_slug) ?? products[0]
-    return paymentOptions(product.price) as T
+    return paymentOptions(product) as T
   }
 
   if (name === 'predict-phone') {

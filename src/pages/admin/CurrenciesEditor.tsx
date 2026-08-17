@@ -14,7 +14,7 @@ const OPTIONS = {
     label: 'Franc congolais (CDF)',
     decimals: 0,
     roundTo: 100,
-    defaultRate: 4.4,
+    defaultRate: 4.04,
     hint: 'Combien de francs congolais pour 1 FCFA.',
   },
 } as const

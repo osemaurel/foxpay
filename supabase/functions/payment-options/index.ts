@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
 
   const query = admin
     .from('products')
-    .select('price')
+    .select('price, compare_at_price')
     .eq('shop_id', shop.id)
     .eq('is_active', true)
 
@@ -78,9 +78,11 @@ Deno.serve(async (req) => {
     const priced = priceForCountry(country.country, product.price, (extras ?? []) as ShopCurrency[])
     if (!priced) continue
 
-    const providers = country.providers
-      .filter((p) => p.currency === priced.currency && p.deposit.status !== 'CLOSED')
-      .map((p) => ({
+    const retenus = country.providers.filter(
+      (p) => p.currency === priced.currency && p.deposit.status !== 'CLOSED',
+    )
+
+    const providers = retenus.map((p) => ({
         provider: p.provider,
         name: p.displayName,
         logo: p.logo,
@@ -96,12 +98,22 @@ Deno.serve(async (req) => {
       }))
 
     if (providers.length > 0) {
+      // Le prix barré suit la même conversion que le total : afficher
+      // « 20 000 FCFA » au-dessus d'un total en francs congolais mélangerait
+      // deux monnaies dans le même récapitulatif.
+      const compare = product.compare_at_price
+        ? priceForCountry(country.country, product.compare_at_price, (extras ?? []) as ShopCurrency[])
+        : null
+
       countries.push({
         country: country.country,
         name: country.name,
         prefix: country.prefix,
         flag: country.flag,
         currency: priced.currency,
+        compare_amount: compare
+          ? formatAmount(compare.amount, retenus[0].deposit.decimalsInAmount)
+          : null,
         providers,
       })
     }
