@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { missingEnv, supabase } from './lib/supabase'
 import { Spinner } from './components/ui'
+import ScrollToTop from './components/ScrollToTop'
 import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
 import ShopLayout from './pages/shop/ShopLayout'
@@ -34,6 +35,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* Boutique publique */}
         <Route path="/boutique/:slug" element={<ShopLayout />}>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { callFunction } from '../../lib/supabase'
 import type { Product } from '../../lib/types'
-import { formatCharged, formatFileSize, formatPrice } from '../../lib/format'
+import { formatCharged, formatPrice } from '../../lib/format'
 import { Alert, Eyebrow, Field, Spinner, inputClass } from '../../components/ui'
 import { useShop } from './ShopLayout'
 
@@ -309,7 +309,6 @@ export default function Checkout() {
               <Field label="Ton nom">
                 <input
                   required
-                  autoFocus
                   autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -479,13 +478,12 @@ export default function Checkout() {
           )}
         </div>
 
-        <aside className="order-1 space-y-4 lg:order-2">
+        <aside className="order-1 lg:order-2">
           <Summary
             product={product}
             accent={accent}
             charged={payable && country ? { amount: payable, currency: country.currency } : null}
           />
-          <Delivery product={product} />
         </aside>
       </div>
     </main>
@@ -700,32 +698,6 @@ function Summary({
           </span>
         </div>
       </div>
-    </section>
-  )
-}
-
-/** Ce que l'acheteur reçoit, rappelé au moment où il sort son téléphone. */
-function Delivery({ product }: { product: Product }) {
-  const lines = [
-    ['Le fichier', product.file_name ?? 'Fichier numérique', formatFileSize(product.file_size)],
-    ['Livraison', 'Par email, immédiate', 'Dès le paiement confirmé'],
-    ['Ton accès', '24 h · 3 téléchargements', 'De quoi le mettre à l’abri'],
-  ]
-
-  return (
-    <section className="rounded-2xl border border-line bg-raise p-5">
-      <Eyebrow>Ce que tu reçois</Eyebrow>
-      <dl className="mt-4 space-y-3 text-sm">
-        {lines.map(([label, value, note]) => (
-          <div key={label}>
-            <dt className="text-xs text-ink-faint">{label}</dt>
-            <dd className="truncate font-medium text-ink" title={value}>
-              {value}
-            </dd>
-            {note && <dd className="text-xs text-ink-faint">{note}</dd>}
-          </div>
-        ))}
-      </dl>
     </section>
   )
 }
