@@ -111,40 +111,88 @@ const products: Product[] = CATALOGUE.map(
   }),
 )
 
-const orders: Order[] = [
-  ['aminata.kone@gmail.com', 'paid', 0, 0],
-  ['serge.bamba@yahoo.fr', 'paid', 1, 1],
-  ['fatou.d@outlook.com', 'pending', 1, 0],
-  ['k.yao@gmail.com', 'paid', 2, 2],
-  ['moussa.traore@gmail.com', 'failed', 3, 0],
-  ['awa.cisse@gmail.com', 'paid', 5, 1],
-  ['jb.kouassi@gmail.com', 'paid', 8, 0],
-].map(([email, status, days, produit], i) => ({
-  id: `order-${i}`,
-  shop_id: 'shop-1',
-  product_id: `product-${produit}`,
-  buyer_email: email as string,
-  buyer_name: null,
-  buyer_phone: null,
-  amount: products[produit as number].price,
-  currency: 'XOF',
-  status: status as Order['status'],
-  provider: 'pawapay',
-  checkout_id: `checkout-${i}`,
-  checkout_code: `CODE${i}`,
-  country: status === 'paid' ? 'CIV' : null,
-  provider_transaction_id: null,
-  failure_reason: null,
-  checkout_url: null,
-  paid_at: status === 'paid' ? daysAgo(days as number) : null,
-  download_token: `token-${i}`,
-  download_expires_at: null,
-  download_count: status === 'paid' ? [1, 2, 0, 1, 0, 3, 1][i] : 0,
-  max_downloads: 3,
-  delivered_at: status === 'paid' ? daysAgo(days as number) : null,
-  created_at: daysAgo(days as number),
-  updated_at: daysAgo(days as number),
-}))
+/**
+ * Sept commandes qui couvrent ce que l'administration doit savoir montrer :
+ * plusieurs pays, plusieurs opérateurs, un paiement converti en francs
+ * congolais, une attente, et deux échecs pour des raisons différentes.
+ */
+const COMMANDES: [string, string, Order['status'], number, number, string, string, string | null][] =
+  [
+    ['aminata.kone@gmail.com', 'Aminata Koné', 'paid', 0, 0, 'CIV', 'ORANGE_CIV', null],
+    ['serge.bamba@yahoo.fr', 'Serge Bamba', 'paid', 1, 1, 'CIV', 'MTN_MOMO_CIV', null],
+    ['fatou.d@outlook.com', 'Fatou Diallo', 'pending', 1, 0, 'SEN', 'WAVE_SEN', null],
+    ['k.yao@gmail.com', 'Kouamé Yao', 'paid', 2, 2, 'CMR', 'MTN_MOMO_CMR', null],
+    [
+      'moussa.traore@gmail.com',
+      'Moussa Traoré',
+      'failed',
+      3,
+      0,
+      'CIV',
+      'MOOV_CIV',
+      'INSUFFICIENT_BALANCE',
+    ],
+    ['awa.cisse@gmail.com', 'Awa Cissé', 'paid', 5, 1, 'COD', 'VODACOM_MPESA_COD', null],
+    [
+      'jb.kouassi@gmail.com',
+      'Jean-Baptiste Kouassi',
+      'failed',
+      8,
+      0,
+      'SEN',
+      'ORANGE_SEN',
+      'PAYMENT_NOT_APPROVED',
+    ],
+  ]
+
+const INDICATIFS: Record<string, string> = { CIV: '225', SEN: '221', CMR: '237', COD: '243' }
+const TAUX_CDF = 4.042129
+const avecFraisDemo = (prix: number) => Math.ceil(prix * 1.03)
+
+const orders: Order[] = COMMANDES.map(
+  ([email, nom, status, days, produit, pays, operateur, echec], i) => {
+    const prix = products[produit].price
+    const congolais = pays === 'COD'
+      ? Math.round((avecFraisDemo(prix) * TAUX_CDF) / 100) * 100
+      : null
+
+    return {
+      id: `order-${i}`,
+      shop_id: 'shop-1',
+      product_id: `product-${produit}`,
+      buyer_email: email,
+      buyer_name: nom,
+      // L'indicatif suit le pays : un numéro ivoirien sur une vente congolaise
+      // se remarque tout de suite dans l'aperçu.
+      buyer_phone: `${INDICATIFS[pays]}0700${String(10 + i).padStart(4, '0')}`,
+      amount: prix,
+      currency: 'XOF',
+      charged_amount: congolais ?? avecFraisDemo(prix),
+      charged_currency: congolais ? 'CDF' : 'XOF',
+      status,
+      provider: 'pawapay',
+      mmo_provider: operateur,
+      deposit_id: `4a1f${i}b93-7849-49aa-babb-4c3ccbfe3d7${i}`,
+      country: pays,
+      provider_transaction_id: status === 'paid' ? `PP${8371000 + i * 137}` : null,
+      failure_code: echec,
+      failure_reason:
+        echec === 'INSUFFICIENT_BALANCE'
+          ? 'The customer does not have enough funds to perform the deposit.'
+          : echec
+            ? 'The customer did not approve the authorisation for this payment'
+            : null,
+      paid_at: status === 'paid' ? daysAgo(days) : null,
+      download_token: `token-${i}`,
+      download_expires_at: status === 'paid' ? daysAgo(days - 1) : null,
+      download_count: status === 'paid' ? [1, 2, 0, 1, 0, 3, 1][i] : 0,
+      max_downloads: 3,
+      delivered_at: status === 'paid' ? daysAgo(days) : null,
+      created_at: daysAgo(days),
+      updated_at: daysAgo(days),
+    }
+  },
+)
 
 const AVIS: [number, string, string, number, string][] = [
   [0, 'Aminata Koné', 'Coiffeuse, Abidjan', 5,

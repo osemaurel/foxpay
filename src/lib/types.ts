@@ -62,15 +62,22 @@ export type Order = {
   buyer_phone: string | null
   amount: number
   currency: string
+  /** Ce que l'acheteur a réellement payé, frais compris et dans sa devise. */
+  charged_amount: number | null
+  charged_currency: string | null
   status: OrderStatus
+  /** Le prestataire de paiement : pawapay. */
   provider: string
-  checkout_id: string
-  checkout_code: string | null
-  /** Pays depuis lequel l'acheteur a payé, connu à la confirmation. */
+  /** L'opérateur mobile money choisi par l'acheteur (MTN_MOMO_CIV…). */
+  mmo_provider: string | null
+  deposit_id: string
+  /** Pays du portefeuille utilisé pour payer. */
   country: string | null
   provider_transaction_id: string | null
+  /** Code d'échec pawaPay (PAYMENT_NOT_APPROVED…). */
+  failure_code: string | null
+  /** Message d'origine de pawaPay, en anglais, destiné au vendeur. */
   failure_reason: string | null
-  checkout_url: string | null
   paid_at: string | null
   download_token: string
   download_expires_at: string | null
