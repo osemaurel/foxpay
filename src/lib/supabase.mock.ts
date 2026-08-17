@@ -267,11 +267,68 @@ export const supabase = {
   // deno-lint-ignore no-explicit-any
 } as any
 
-export async function callFunction<T>(name: string): Promise<T> {
-  if (name === 'order-status') {
-    return { status: 'paid', download_url: '#' } as T
+/**
+ * Moyens de paiement de l'aperçu. Sur la vraie boutique, cette liste vient de
+ * la configuration du compte pawaPay — elle suit les opérateurs réellement
+ * activés, pays par pays.
+ */
+const PAYS = [
+  ['CIV', "Côte d'Ivoire", '225', 'XOF', ['Orange', 'MTN', 'Moov', 'Wave']],
+  ['SEN', 'Sénégal', '221', 'XOF', ['Orange', 'Free', 'Wave']],
+  ['BEN', 'Bénin', '229', 'XOF', ['MTN', 'Moov']],
+  ['CMR', 'Cameroun', '237', 'XAF', ['MTN', 'Orange']],
+] as const
+
+function paymentOptions(price: number) {
+  return {
+    countries: PAYS.map(([country, name, prefix, currency, operateurs]) => ({
+      country,
+      name,
+      prefix,
+      flag: null,
+      currency,
+      providers: operateurs.map((operateur) => ({
+        provider: `${operateur.toUpperCase()}_${country}`,
+        name: operateur,
+        logo: null,
+        amount: String(price),
+        auth_type: 'PROVIDER_AUTH',
+        pin_prompt: 'AUTOMATIC',
+        pin_prompt_revivable: false,
+        instructions: null,
+        merchant_name: 'ATELIER KODI',
+      })),
+    })),
   }
-  throw new Error(
-    "Aperçu : le paiement n'est pas branché. Sur la vraie boutique, ce bouton ouvre la page mobile money.",
-  )
+}
+
+// L'aperçu simule une attente : deux interrogations avant la confirmation,
+// comme le temps que met l'acheteur à composer son code PIN.
+let attentes = 0
+
+export async function callFunction<T>(name: string, body?: unknown): Promise<T> {
+  const params = (body ?? {}) as { product_slug?: string }
+
+  if (name === 'payment-options') {
+    const product = products.find((p) => p.slug === params.product_slug) ?? products[0]
+    return paymentOptions(product.price) as T
+  }
+
+  if (name === 'predict-phone') {
+    return { valid: true, country: 'CIV', provider: 'ORANGE_CIV', phoneNumber: '2250700000000' } as T
+  }
+
+  if (name === 'create-payment') {
+    attentes = 0
+    return { order_id: 'demo', next_step: 'FINAL_STATUS' } as T
+  }
+
+  if (name === 'order-status') {
+    attentes += 1
+    return attentes < 3
+      ? ({ status: 'pending', download_url: null, authorization_url: null, message: null } as T)
+      : ({ status: 'paid', download_url: '#', authorization_url: null, message: null } as T)
+  }
+
+  throw new Error(`Aperçu : la fonction « ${name} » n'est pas branchée.`)
 }

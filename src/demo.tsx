@@ -7,7 +7,6 @@ import ShopHome from './pages/shop/ShopHome'
 import ShopProductPage from './pages/shop/ProductPage'
 import ShopCheckout from './pages/shop/Checkout'
 import Login from './pages/Login'
-import Return from './pages/Return'
 import AdminLayout from './pages/admin/AdminLayout'
 import Home from './pages/admin/Home'
 import ProductsList from './pages/admin/ProductsList'
@@ -57,13 +56,15 @@ const SCREENS = [
     ),
   },
   {
-    id: 'return',
-    label: 'Après paiement',
-    note: 'La page où l’acheteur atterrit en revenant du mobile money, une fois le paiement confirmé.',
+    id: 'checkout',
+    label: 'Paiement',
+    note: 'Tout se passe ici : pays, numéro, opérateur. La demande part sur le téléphone de l’acheteur, sans quitter la boutique.',
     render: () => (
-      <MemoryRouter initialEntries={['/boutique/atelier-kodi/retour?order=demo']}>
+      <MemoryRouter initialEntries={['/boutique/atelier-kodi/checkout/vendre-en-ligne']}>
         <Routes>
-          <Route path="/boutique/:slug/retour" element={<Return />} />
+          <Route path="/boutique/:slug" element={<ShopLayout />}>
+            <Route path="checkout/:productSlug" element={<ShopCheckout />} />
+          </Route>
         </Routes>
       </MemoryRouter>
     ),

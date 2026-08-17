@@ -5,7 +5,6 @@ import { missingEnv, supabase } from './lib/supabase'
 import { Spinner } from './components/ui'
 import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
-import Return from './pages/Return'
 import ShopLayout from './pages/shop/ShopLayout'
 import ShopHome from './pages/shop/ShopHome'
 import ProductPage from './pages/shop/ProductPage'
@@ -42,7 +41,6 @@ export default function App() {
           <Route path="p/:productSlug" element={<ProductPage />} />
           <Route path="checkout/:productSlug" element={<Checkout />} />
         </Route>
-        <Route path="/boutique/:slug/retour" element={<Return />} />
 
         <Route path="/login" element={session ? <Navigate to="/admin" replace /> : <Login />} />
 

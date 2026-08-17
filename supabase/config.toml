@@ -1,6 +1,6 @@
 project_id = "foxpay"
 
-# Ces quatre fonctions sont appelées par des visiteurs non authentifiés
+# Ces fonctions sont appelées par des visiteurs non authentifiés
 # (acheteur ou serveurs pawaPay) : pas de JWT à vérifier. Leur sécurité tient
 # à ce qu'elles vérifient elles-mêmes — voir les commentaires de chaque
 # fonction.
@@ -15,4 +15,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.download]
+verify_jwt = false
+
+[functions.payment-options]
+verify_jwt = false
+
+[functions.predict-phone]
 verify_jwt = false

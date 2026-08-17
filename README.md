@@ -16,7 +16,7 @@ Functions), paiement **pawaPay**, email de livraison **Resend**.
 - [x] Étape 6 — Suivi des ventes (admin)
 - [x] Étape 7 — Projet Supabase créé, migrations appliquées, fonctions déployées
 - [ ] **Renseigner les secrets des Edge Functions** — sans eux, rien ne tourne
-- [ ] **Vérifier le corps de la requête pawaPay** — voir « Point ouvert » plus bas
+- [x] Étape 7 — Paiement sur la page de checkout (API `deposits`, sans redirection)
 
 ## Projet Supabase
 
@@ -86,55 +86,71 @@ vérifie payé / non expiré / quota et incrémente le compteur dans la même
 transaction avec `for update` : deux clics simultanés sur le lien ne peuvent pas
 passer tous les deux.
 
-**`country` en ISO 3166-1 alpha-3.** pawaPay en a besoin pour router vers les
-bons opérateurs mobile money. Stocké sur `shops` (modifiable dans l'admin) et
-recopié sur la commande.
+**`country` en ISO 3166-1 alpha-3.** C'est l'acheteur qui le choisit sur la page
+de paiement, et il détermine la devise : le prix de la boutique s'applique tel
+quel dans les sept pays de la zone franc CFA (XOF et XAF sont arrimés à l'euro
+au même taux), et passe par un taux enregistré dans `shop_currencies` pour la
+RDC. `charged_amount` / `charged_currency` gardent ce que l'acheteur a
+réellement payé, `amount` restant le prix de référence.
+
+**La liste des pays et des opérateurs n'est écrite nulle part.** Elle vient de
+`GET /v2/active-conf` : le compte pawaPay est la source de vérité, donc activer
+un opérateur chez eux le fait apparaître sur la boutique sans toucher au code,
+et une coupure (`status: CLOSED`) le retire de la liste.
 
 ## Parcours d'achat
 
+Tout se passe sur `/boutique/:slug/checkout/:produit`. L'acheteur ne quitte pas
+la boutique : la demande de paiement part sur son téléphone, il compose son code
+PIN, et la page bascule d'elle-même sur le lien de téléchargement.
+
 ```
-Acheteur : /boutique/:slug → saisit son email
+Page de paiement
     │
-    ├─> create-payment ──> crée l'order (pending) ──> pawaPay /v2/paymentpage
-    │                                                      │
-    │   <── redirectUrl ───────────────────────────────────┘
-    ▼
-Page de paiement pawaPay (mobile money)
+    ├─> payment-options ──> GET /v2/active-conf  (pays, opérateurs, montants)
+    ├─> predict-phone   ──> POST /v2/predict-provider  (numéro + opérateur deviné)
     │
-    ├─> retour navigateur : /boutique/:slug/retour?order=<id>
-    │        └─> order-status (polling avec backoff) ─┐
-    │                                                 ├─> settleOrder()
-    └─> callback serveur : pawapay-callback ──────────┘        │
-                                                               ▼
-                                          GET /v2/deposits/{id} = vérité
-                                                               │
-                                            order → paid, email Resend envoyé
-                                                               │
-                                    lien /functions/v1/download?token=…
-                                                               │
-                                  consume_download() → URL signée 60 s
+    ▼  nom, email, pays, numéro, opérateur
+create-payment
+    │  revalide pays / opérateur / montant contre active-conf
+    │  crée l'order (pending) AVANT l'appel
+    └─> POST /v2/deposits ──> invite de code PIN sur le téléphone
+    │
+    ├─> order-status (polling, 3 s) ──────────┐
+    │                                          ├─> settleOrder()
+    └─> callback serveur : pawapay-callback ──┘        │
+                                                       ▼
+                                    GET /v2/deposits/{id} = vérité
+                                                       │
+                                    order → paid, email Resend envoyé
+                                                       │
+                            lien /functions/v1/download?token=…
+                                                       │
+                          consume_download() → URL signée 60 s
 ```
 
-Les deux chemins de confirmation (retour navigateur et callback serveur) passent
-par la même fonction `settleOrder()`. Le polling n'est pas un luxe : un callback
-peut être retardé, mal configuré ou perdu, et l'acheteur attend son fichier.
+Les deux chemins de confirmation (polling de la page et callback serveur)
+passent par la même fonction `settleOrder()`. Le polling n'est pas un luxe : un
+callback peut être retardé, mal configuré ou perdu, et l'acheteur attend son
+fichier.
 
-## Point ouvert : le corps de `/v2/paymentpage`
+### Les trois façons d'autoriser un paiement
 
-`docs.pawapay.io` et `www.pawapay.io` sont bloqués par la politique réseau de
-l'environnement où ce code a été écrit. Le corps de la requête dans
-`supabase/functions/_shared/pawapay.ts` est donc **reconstitué** et doit être
-confronté à la doc avant la production.
+`active-conf` donne l'`authType` de chaque opérateur, et l'interface s'y adapte :
 
-- Sûrs : `depositId` (UUIDv4 fourni par le marchand), `returnUrl`, `reason`,
-  `msisdn` (facultatif), et la réponse qui porte `redirectUrl`.
-- À confirmer : le montant est envoyé dans `amountDetails: { amount, currency }`
-  avec `amount` en chaîne, plus un champ `country` au même niveau. C'est la
-  forme v2 telle qu'elle ressort des sources secondaires, pas de la doc.
+| `authType` | Ce que voit l'acheteur |
+|---|---|
+| `PROVIDER_AUTH` | Une invite de code PIN sur son téléphone. Si `pinPrompt` vaut `MANUAL` ou si l'invite est relançable, les instructions de pawaPay (composer `*840#`…) sont affichées pendant l'attente. |
+| `PREAUTH` | Un champ pour le code à usage unique, précédé des instructions pour le générer. Envoyé comme `preAuthorisationCode`. |
+| `REDIRECT_AUTH` | Le seul cas où l'acheteur quitte la page : Wave impose son propre écran. `order-status` renvoie l'`authorizationUrl` dès que pawaPay la publie, et `successfulUrl` / `failedUrl` le ramènent sur sa page de paiement. |
 
-Le reste du code ne dépend pas de ces détails : `getDepositStatus()` cherche
-l'objet portant un `depositId` quelle que soit l'enveloppe de la réponse, et la
-confirmation de paiement ne passe que par lui.
+### Ce qui n'est jamais cru sur parole
+
+Le navigateur envoie un pays, un opérateur et un numéro — pas un montant.
+`create-payment` recalcule le prix, vérifie que l'opérateur existe et encaisse
+dans la devise du pays, contrôle les limites de transaction de l'opérateur, et
+renormalise le numéro via `predict-provider`. Une requête forgée ne peut donc
+pas payer 1 XOF un produit à 19 000.
 
 ## Mise en route
 
@@ -163,21 +179,23 @@ supabase secrets set \
   RESEND_FROM="Boutique <no-reply@ton-domaine.com>"
 ```
 
-`SITE_URL` doit être joignable depuis Internet : pawaPay refuse un `returnUrl`
-en `localhost`. Pour tester en local, passe par un tunnel (ngrok, cloudflared).
+`SITE_URL` sert à construire les URL de retour des opérateurs à redirection
+(Wave) : elle doit être joignable depuis Internet. Pour tester en local, passe
+par un tunnel (ngrok, cloudflared).
 
 ### 3. Fonctions — déjà déployées
 
 Les quatre tournent déjà. Pour republier après modification :
 
 ```bash
-supabase functions deploy create-payment pawapay-callback order-status download
+supabase functions deploy create-payment pawapay-callback order-status download \
+  payment-options predict-phone
 ```
 
 Puis, dans le dashboard pawaPay, pointe l'URL de callback des dépôts sur
 `https://vodgtcipxqkebronwbmu.supabase.co/functions/v1/pawapay-callback`.
 
-Les quatre fonctions sont déclarées `verify_jwt = false` dans `config.toml` :
+Les six fonctions sont déclarées `verify_jwt = false` dans `config.toml` :
 elles sont appelées par des visiteurs non authentifiés (acheteur, serveurs
 pawaPay). Chacune fait ses propres vérifications.
 
