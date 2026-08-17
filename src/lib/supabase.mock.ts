@@ -93,7 +93,7 @@ const products: Product[] = CATALOGUE.map(
     title,
     description:
       i === 0
-        ? "<p>84 pages pour passer de « je poste sur WhatsApp » à une boutique qui encaisse toute seule.</p><p><strong>Au programme :</strong></p><ul><li>choisir son offre et la formuler</li><li>fixer son prix en XOF</li><li>brancher le mobile money</li><li>les 12 messages de relance qui marchent</li></ul>"
+        ? "<p>84 pages pour passer de « je poste sur WhatsApp » à une boutique qui encaisse toute seule.</p><p><strong>Au programme :</strong></p><ul><li>choisir son offre et la formuler</li><li>fixer son prix en FCFA</li><li>brancher le mobile money</li><li>les 12 messages de relance qui marchent</li></ul>"
         : `<p>${title}. Livré immédiatement après paiement, sans intermédiaire.</p>`,
     price,
     // Un prix barré sur deux produits, pour montrer les deux rendus.

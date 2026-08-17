@@ -5,8 +5,9 @@ import { Alert, Button, Card, Field, inputClass } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
 /**
- * pawaPay ne propose que ces deux devises hors zone franc CFA, et les deux ne
- * concernent que la RDC. Vodacom, Airtel et Orange y acceptent l'USD.
+ * La RDC est le seul pays hors zone franc CFA atteignable par pawaPay, et on y
+ * vend en franc congolais. La plateforme y accepterait aussi le dollar, mais
+ * c'est une décision commerciale : un seul prix, dans la monnaie du pays.
  */
 const OPTIONS = {
   CDF: {
@@ -14,14 +15,7 @@ const OPTIONS = {
     decimals: 0,
     roundTo: 100,
     defaultRate: 4.4,
-    hint: 'Combien de francs congolais pour 1 XOF.',
-  },
-  USD: {
-    label: 'Dollar américain (USD)',
-    decimals: 2,
-    roundTo: 1,
-    defaultRate: 0.00165,
-    hint: 'Combien de dollars pour 1 XOF. Très utilisé en RDC et plus stable que le CDF.',
+    hint: 'Combien de francs congolais pour 1 FCFA.',
   },
 } as const
 
@@ -129,13 +123,12 @@ export default function CurrenciesEditor() {
   return (
     <Card title="Vendre en RDC">
       <p className="mb-5 text-sm leading-relaxed text-ink-muted">
-        Les sept pays de la zone franc CFA partagent ton prix tel quel. La République
-        démocratique du Congo a sa propre monnaie : il faut donc un taux de conversion. C'est
-        le seul pays où pawaPay accepte aussi les paiements en dollars.
+        Les pays de la zone franc CFA partagent ton prix tel quel. La République démocratique
+        du Congo a sa propre monnaie : il faut donc un taux de conversion pour y vendre.
       </p>
 
       <div className="space-y-4">
-        <Field label="Devise proposée aux acheteurs congolais">
+        <Field label="Vendre en République démocratique du Congo">
           <select
             value={choix}
             onChange={(e) => {

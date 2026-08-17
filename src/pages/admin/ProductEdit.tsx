@@ -219,7 +219,7 @@ export default function ProductEdit() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Prix (XOF)"
+              label="Prix (FCFA)"
               hint={form.price > 0 ? `Affiché : ${formatPrice(form.price)}` : 'Nombre entier.'}
             >
               <input

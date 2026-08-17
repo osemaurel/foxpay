@@ -138,7 +138,7 @@ export default function SettingsPage() {
           Tes acheteurs paient en mobile money depuis les sept pays de la zone franc CFA
           (Bénin, Burkina&nbsp;Faso, Cameroun, Congo, Côte&nbsp;d'Ivoire, Gabon, Sénégal).
           Chacun choisit son pays et son opérateur au moment de payer ; ton prix reste le même,
-          le XOF et le XAF ayant la même valeur.
+          les deux francs CFA ayant la même valeur.
         </p>
 
         <div className="space-y-4">
