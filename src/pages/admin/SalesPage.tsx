@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { callFunctionAuth, supabase } from '../../lib/supabase'
 import type { Order, Product } from '../../lib/types'
 import { formatCharged, formatDate, formatPrice } from '../../lib/format'
 import { countryName, providerName } from '../../lib/mmo'
@@ -325,6 +325,7 @@ function OrderDetail({
               label="Lien valable jusqu'au"
               valeur={order.download_expires_at ? formatDate(order.download_expires_at) : null}
             />
+            <Renvoi order={order} />
           </Section>
         )}
 
@@ -338,6 +339,54 @@ function OrderDetail({
           <Ligne label="Transaction opérateur" valeur={order.provider_transaction_id} mono />
         </Section>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Renvoyer l'email de livraison.
+ *
+ * Deux cas, et le libellé du bouton dit lequel : rattraper une vente dont
+ * l'email n'est jamais parti — une panne d'envoi laisse la commande livrée à
+ * moitié — ou réexpédier à un acheteur qui ne le trouve plus.
+ */
+function Renvoi({ order }: { order: Order }) {
+  const [etat, setEtat] = useState<'idle' | 'busy' | 'ok'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  const dejaEnvoye = Boolean(order.delivered_at)
+
+  async function envoyer() {
+    setEtat('busy')
+    setError(null)
+    try {
+      await callFunctionAuth('resend-delivery', { order_id: order.id, force: dejaEnvoye })
+      setEtat('ok')
+    } catch (e) {
+      setError((e as Error).message)
+      setEtat('idle')
+    }
+  }
+
+  if (etat === 'ok') {
+    return (
+      <p className="pt-1 text-sm text-go">
+        Email envoyé à {order.buyer_email}.
+      </p>
+    )
+  }
+
+  return (
+    <div className="pt-1">
+      <button
+        type="button"
+        onClick={envoyer}
+        disabled={etat === 'busy'}
+        className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink transition hover:bg-raise disabled:opacity-40"
+      >
+        {etat === 'busy' ? '…' : dejaEnvoye ? "Renvoyer l'email" : "Envoyer l'email"}
+      </button>
+      {error && <p className="mt-2 text-xs leading-relaxed text-stop">{error}</p>}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { admin, downloadUrl } from './admin.ts'
-import { sendDownloadEmail } from './email.ts'
+import { NOMS_PAYS } from './catalogue.ts'
+import { sendDownloadEmail, sendSaleEmail } from './email.ts'
 import { getDeposit } from './pawapay.ts'
 import { getCollection, readStatus, SebPayError } from './sebpay.ts'
 
@@ -34,7 +35,8 @@ export type SettleOutcome = {
 const CHAMPS =
   'id, status, provider, deposit_id, delivered_at, download_token, buyer_email, created_at, ' +
   'failure_code, authorization_url, provider_checked_at, ' +
-  'shops(name, contact_email), products(title)'
+  'buyer_name, buyer_phone, charged_amount, charged_currency, country, mmo_provider, ' +
+  'shops(name, contact_email, owner_id), products(title)'
 
 type Commande = {
   id: string
@@ -48,9 +50,17 @@ type Commande = {
   delivered_at: string | null
   download_token: string
   buyer_email: string
+  buyer_name: string | null
+  buyer_phone: string | null
+  charged_amount: number | null
+  charged_currency: string | null
+  country: string | null
+  mmo_provider: string | null
   shops: unknown
   products: unknown
 }
+
+type Boutique = { name: string; contact_email: string | null; owner_id: string }
 
 /**
  * Règle une commande à partir de l'état réel du paiement chez son processeur.
@@ -257,11 +267,18 @@ function done(
   return { result, authorizationUrl: null, failureCode: null, ...extra }
 }
 
-/** Envoie l'email une seule fois. Une erreur d'envoi est propagée à l'appelant. */
+/**
+ * Livre la commande : le fichier à l'acheteur, puis l'avis au vendeur.
+ *
+ * Une seule fois — `delivered_at` en est le garde-fou. L'échec de l'email
+ * d'achat est propagé : c'est la livraison elle-même, l'appelant doit le
+ * savoir. Celui du vendeur ne l'est pas : perdre une notification ne doit pas
+ * faire retenter une livraison déjà faite.
+ */
 async function deliver(order: Commande): Promise<void> {
   if (order.delivered_at) return
 
-  const shop = order.shops as { name: string; contact_email: string | null }
+  const shop = order.shops as Boutique
   const product = order.products as { title: string }
 
   await sendDownloadEmail({
@@ -276,4 +293,55 @@ async function deliver(order: Commande): Promise<void> {
     .from('orders')
     .update({ delivered_at: new Date().toISOString() })
     .eq('id', order.id)
+
+  try {
+    await prevenirVendeur(order, shop, product.title)
+  } catch (e) {
+    console.error('avis de vente', e)
+  }
+}
+
+/**
+ * L'avis de vente, à l'adresse de contact de la boutique — ou, à défaut, à
+ * celle du compte. Un vendeur qui n'a pas rempli ce champ doit quand même
+ * apprendre qu'il a vendu.
+ */
+async function prevenirVendeur(
+  order: Commande,
+  shop: Boutique,
+  productTitle: string,
+): Promise<void> {
+  let destinataire = shop.contact_email
+
+  if (!destinataire) {
+    const { data } = await admin.auth.admin.getUserById(shop.owner_id)
+    destinataire = data?.user?.email ?? null
+  }
+
+  if (!destinataire) {
+    console.warn('avis de vente sans destinataire', order.id)
+    return
+  }
+
+  await sendSaleEmail({
+    to: destinataire,
+    shopName: shop.name,
+    productTitle,
+    buyerName: order.buyer_name,
+    buyerEmail: order.buyer_email,
+    buyerPhone: order.buyer_phone,
+    montant: montantLisible(order),
+    countryName: order.country ? (NOMS_PAYS[order.country] ?? order.country) : null,
+    operateur: order.mmo_provider,
+  })
+}
+
+/** Les deux francs CFA s'écrivent FCFA ; le reste garde son code ISO. */
+const SIGLES: Record<string, string> = { XOF: 'FCFA', XAF: 'FCFA' }
+
+function montantLisible(order: Commande): string {
+  if (order.charged_amount === null || !order.charged_currency) return '—'
+
+  const montant = Math.round(Number(order.charged_amount)).toLocaleString('fr-FR')
+  return `${montant} ${SIGLES[order.charged_currency] ?? order.charged_currency}`
 }

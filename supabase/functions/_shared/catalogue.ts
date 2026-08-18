@@ -25,7 +25,7 @@ const ALPHA2_VERS_ALPHA3: Record<string, string> = {
 }
 
 /** Noms français, quand aucun processeur n'en fournit un présentable. */
-const NOMS_PAYS: Record<string, string> = {
+export const NOMS_PAYS: Record<string, string> = {
   BEN: 'Bénin', BFA: 'Burkina Faso', CIV: "Côte d'Ivoire", CMR: 'Cameroun',
   COD: 'République démocratique du Congo', COG: 'Congo', GAB: 'Gabon',
   GHA: 'Ghana', GIN: 'Guinée', GMB: 'Gambie', GNB: 'Guinée-Bissau',

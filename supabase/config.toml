@@ -5,8 +5,9 @@ project_id = "foxpay"
 # sécurité tient à ce qu'elles vérifient elles-mêmes — voir les commentaires de
 # chaque fonction.
 #
-# payment-methods n'est pas dans cette liste : elle sert l'administration, et
-# vérifie en plus le jeton elle-même pour retrouver la boutique.
+# payment-methods et resend-delivery ne sont pas dans cette liste : elles
+# servent l'administration, et vérifient en plus le jeton elles-mêmes pour
+# retrouver la boutique.
 
 [functions.create-payment]
 verify_jwt = false
