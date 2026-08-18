@@ -15,7 +15,7 @@ import { requireEnv } from './admin.ts'
  *
  *   - les pays sont en ISO alpha-2 (CI) là où pawaPay et notre base utilisent
  *     l'alpha-3 (CIV) ;
- *   - l'opérateur est un slug court (« mtn ») et non un code par pays ;
+ *   - l'opérateur est identifié par son `code` (« mtn »), pas par son `slug` ;
  *   - le callback est signé en HMAC-SHA256, donc vérifiable — pawaPay n'en
  *     signe pas, ce qui nous obligeait à toujours redemander le statut.
  */
@@ -79,7 +79,14 @@ export type SebPayCountry = {
 export type SebPayOperator = {
   id: string
   name: string
+  /**
+   * Identifiant complet, de la forme « mtn-bj ». Trompeur : la documentation
+   * appelle le champ `operator` de POST /collections un « slug », mais l'envoi
+   * de `mtn-bj` est refusé — « Operator not found or not configured for this
+   * country ». C'est `code` qu'il faut envoyer. Vérifié contre l'API.
+   */
   slug: string
+  /** Ce qu'attend POST /collections. Insensible à la casse. */
   code: string
   country: unknown
   otp_required: boolean
@@ -132,6 +139,7 @@ export function createCollection(input: {
     currency: input.currency,
     // Format international sans le « + ».
     phone: input.phone.replace(/\D/g, ''),
+    // `code` de l'opérateur, pas son `slug` — voir SebPayOperator.
     operator: input.operator,
     country: input.country,
     external_reference: input.externalReference,
