@@ -63,6 +63,23 @@ const POLL_MS = 3000
 /** Au-delà, l'invite de code PIN a expiré chez tous les opérateurs. */
 const POLL_DEADLINE_MS = 5 * 60 * 1000
 
+/**
+ * Envoie l'acheteur sur l'écran d'autorisation de l'opérateur (Wave), une seule
+ * fois par commande. Le lien reste attaché à la commande tant qu'elle est en
+ * attente : sans cette mémoire, l'acheteur qui en revient serait aussitôt
+ * renvoyé là-bas, en boucle.
+ *
+ * Renvoie vrai quand la redirection est lancée.
+ */
+function goToAuth(orderId: string, url: string): boolean {
+  const cle = `foxpay:auth:${orderId}`
+  if (sessionStorage.getItem(cle)) return false
+
+  sessionStorage.setItem(cle, '1')
+  window.location.href = url
+  return true
+}
+
 export default function Checkout() {
   const { productSlug } = useParams<{ productSlug: string }>()
   const [params, setParams] = useSearchParams()
@@ -204,12 +221,7 @@ export default function Checkout() {
       const reply = await poll(orderId!)
       if (cancelled || !reply) return schedule()
 
-      if (reply.authorization_url) {
-        // Wave et les autres opérateurs à redirection imposent leur propre
-        // écran d'autorisation. On y envoie l'acheteur, il reviendra ici.
-        window.location.href = reply.authorization_url
-        return
-      }
+      if (reply.authorization_url && goToAuth(orderId!, reply.authorization_url)) return
 
       if (reply.status === 'paid') {
         setDownloadUrl(reply.download_url)
@@ -272,7 +284,10 @@ export default function Checkout() {
     setBusy(true)
     setError(null)
     try {
-      const { order_id } = await callFunction<{ order_id: string }>('create-payment', {
+      const { order_id, authorization_url } = await callFunction<{
+        order_id: string
+        authorization_url?: string | null
+      }>('create-payment', {
         slug: shop.slug,
         product_slug: product!.slug,
         buyer_name: name,
@@ -290,6 +305,8 @@ export default function Checkout() {
       startedAt.current = 0
       setTimedOut(false)
       setStage('waiting')
+
+      if (authorization_url) goToAuth(order_id, authorization_url)
     } catch (e) {
       setError((e as Error).message)
     }

@@ -29,13 +29,20 @@ function headers() {
 /**
  * Zone franc CFA. XOF et XAF sont tous deux arrimés à l'euro au même taux
  * (655,957) : un prix de 15 000 vaut 15 000 dans les deux devises, donc le
- * prix de la boutique s'applique tel quel dans ces sept pays.
+ * prix de la boutique s'applique tel quel dans ces onze pays.
+ *
+ * La liste est celle de la zone, pas celle d'un processeur : c'est le catalogue
+ * qui décide de ce qui est proposé, ce module ne dit que ce qu'on sait facturer.
  */
 export const CFA_CURRENCIES: Record<string, string> = {
   BEN: 'XOF',
   BFA: 'XOF',
   CIV: 'XOF',
+  GNB: 'XOF',
+  MLI: 'XOF',
+  NER: 'XOF',
   SEN: 'XOF',
+  TGO: 'XOF',
   CMR: 'XAF',
   COG: 'XAF',
   GAB: 'XAF',

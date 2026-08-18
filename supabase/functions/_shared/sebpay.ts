@@ -1,4 +1,5 @@
 import { requireEnv } from './admin.ts'
+import { fetchViaIpFixe } from './fixie.ts'
 
 /**
  * Intégration SebPay — API v1, endpoint « collections ».
@@ -35,7 +36,8 @@ function headers() {
  * On déballe ici pour que le reste du code ne voie que la charge utile.
  */
 async function appel<T>(chemin: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${chemin}`, { ...init, headers: headers() })
+  // Par le relais à IP fixe : SebPay refuse les appels venus d'ailleurs.
+  const res = await fetchViaIpFixe(`${BASE}${chemin}`, { ...init, headers: headers() })
   const texte = await res.text()
 
   let enveloppe: { success?: boolean; data?: T; message?: string }

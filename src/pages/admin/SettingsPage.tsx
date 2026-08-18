@@ -5,6 +5,7 @@ import { slugify } from '../../lib/slug'
 import type { Shop } from '../../lib/types'
 import { Alert, Button, Card, Field, ImagePicker, inputClass } from '../../components/ui'
 import CurrenciesEditor from './CurrenciesEditor'
+import RoutingEditor from './RoutingEditor'
 import { useAdmin } from './AdminLayout'
 
 export default function SettingsPage() {
@@ -163,10 +164,11 @@ export default function SettingsPage() {
 
       <Card title="Paiement et contact">
         <p className="mb-5 text-sm text-ink-muted">
-          Tes acheteurs paient en mobile money depuis les sept pays de la zone franc CFA
-          (Bénin, Burkina&nbsp;Faso, Cameroun, Congo, Côte&nbsp;d'Ivoire, Gabon, Sénégal).
-          Chacun choisit son pays et son opérateur au moment de payer ; ton prix reste le même,
-          les deux francs CFA ayant la même valeur.
+          Tes acheteurs paient en mobile money depuis la zone franc CFA — Bénin,
+          Burkina&nbsp;Faso, Cameroun, Congo, Côte&nbsp;d'Ivoire, Gabon, Guinée-Bissau, Mali,
+          Niger, Sénégal, Togo — et depuis la RDC si tu y as réglé un taux. Chacun choisit son
+          pays et son opérateur au moment de payer&nbsp;; ton prix reste le même, les deux
+          francs CFA ayant la même valeur.
         </p>
 
         <div className="space-y-4">
@@ -195,6 +197,7 @@ export default function SettingsPage() {
       </form>
 
       <CurrenciesEditor />
+      <RoutingEditor />
     </>
   )
 }

@@ -11,19 +11,31 @@
  */
 
 /**
- * Correspondance ISO alpha-2 → alpha-3, limitée aux pays où cette boutique
- * peut encaisser. Un acheteur ailleurs n'est pas « mal détecté » : il n'est
- * simplement pas présélectionné, et choisit son pays lui-même.
+ * Correspondance ISO alpha-2 → alpha-3, limitée aux pays couverts par l'un des
+ * deux processeurs. Traduire ne présélectionne rien : c'est la page de paiement
+ * qui ne retient le pays deviné que si la boutique y vend vraiment. Un acheteur
+ * ailleurs n'est pas « mal détecté », il choisit simplement son pays lui-même.
  */
 const ALPHA2_TO_ALPHA3: Record<string, string> = {
   BJ: 'BEN',
   BF: 'BFA',
-  CI: 'CIV',
-  SN: 'SEN',
-  CM: 'CMR',
-  CG: 'COG',
-  GA: 'GAB',
   CD: 'COD',
+  CG: 'COG',
+  CI: 'CIV',
+  CM: 'CMR',
+  GA: 'GAB',
+  GH: 'GHA',
+  GM: 'GMB',
+  GN: 'GIN',
+  GW: 'GNB',
+  KE: 'KEN',
+  ML: 'MLI',
+  NE: 'NER',
+  NG: 'NGA',
+  SN: 'SEN',
+  TG: 'TGO',
+  TZ: 'TZA',
+  UG: 'UGA',
 }
 
 /** Une réponse lente vaut une réponse absente : la page ne doit pas attendre. */

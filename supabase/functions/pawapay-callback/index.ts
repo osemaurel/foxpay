@@ -1,10 +1,10 @@
 import { fail, json } from '../_shared/cors.ts'
 import { extractDepositId } from '../_shared/pawapay.ts'
-import { settleOrder } from '../_shared/settle.ts'
+import { settleDeposit } from '../_shared/settle.ts'
 
 /**
  * Callback pawaPay. Du corps de la requête on ne retient que le depositId : le
- * statut réel est redemandé à l'API pawaPay dans settleOrder(). Vérifier la
+ * statut réel est redemandé à l'API pawaPay dans settleDeposit(). Vérifier la
  * signature du callback devient donc facultatif — un faux callback ne peut pas
  * déclencher une livraison.
  *
@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
   if (!depositId) return fail('depositId absent du callback')
 
   try {
-    const { result } = await settleOrder(depositId)
+    const { result } = await settleDeposit(depositId)
     if (result === 'unknown') {
       // Rien à réconcilier chez nous : inutile que pawaPay rejoue.
       console.warn('callback pour un depositId inconnu', depositId)

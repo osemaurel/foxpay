@@ -1,5 +1,6 @@
 /**
- * Traduction des codes d'échec pawaPay en messages destinés à l'acheteur.
+ * Traduction des codes d'échec des processeurs en messages destinés à
+ * l'acheteur.
  *
  * La documentation est explicite : les `failureMessage` de l'API sont écrits
  * pour les équipes techniques, pas pour les clients. Ils sont en anglais et
@@ -33,6 +34,13 @@ const MESSAGES: Record<string, string> = {
     "Le montant dépasse les limites de transaction de cet opérateur. Essaie avec un autre opérateur.",
   INVALID_CURRENCY: "Cet opérateur n'accepte pas la devise de ce paiement.",
   DEPOSITS_NOT_ALLOWED: "Cet opérateur n'est pas activé sur cette boutique.",
+
+  // SebPay ne détaille pas ses refus : un seul code, et un message qui reste
+  // vrai quelle qu'en soit la cause.
+  PAYMENT_REJECTED:
+    "L'opérateur a refusé le paiement. Vérifie ton numéro et ton solde, puis réessaie.",
+  NOT_FOUND:
+    "La demande de paiement n'est jamais partie. Rien n'a été débité — tu peux recommencer.",
 }
 
 const DEFAUT = "Le paiement n'a pas abouti. Tu peux réessayer."

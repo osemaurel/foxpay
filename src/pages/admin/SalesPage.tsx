@@ -30,7 +30,14 @@ const ECHECS: Record<string, string> = {
   PROVIDER_TEMPORARILY_UNAVAILABLE: "L'opérateur était en panne à ce moment-là.",
   INVALID_PHONE_NUMBER: 'Le numéro était invalide pour cet opérateur.',
   AMOUNT_OUT_OF_BOUNDS: "Le montant sortait des limites de transaction de l'opérateur.",
-  NOT_FOUND: "La demande de paiement n'est jamais parvenue à pawaPay.",
+  NOT_FOUND: "La demande de paiement n'est jamais parvenue au processeur.",
+  PAYMENT_REJECTED: "L'opérateur a refusé le paiement.",
+}
+
+/** Les deux prestataires qui encaissent, tels qu'on les nomme au vendeur. */
+const PROCESSEURS: Record<string, string> = {
+  pawapay: 'pawaPay',
+  sebpay: 'SebPay',
 }
 
 const FILTERS = [
@@ -274,6 +281,7 @@ function OrderDetail({
 
         <Section titre="Paiement">
           <Ligne label="Opérateur" valeur={providerName(order.mmo_provider)} />
+          <Ligne label="Encaissé par" valeur={PROCESSEURS[order.provider] ?? order.provider} />
           <Ligne label="Montant payé" valeur={montantPaye(order)} />
           <Ligne label="Prix du produit" valeur={formatPrice(order.amount, order.currency)} />
           {frais !== null && (
@@ -296,7 +304,8 @@ function OrderDetail({
             </p>
             {order.failure_reason && (
               <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-                Message de pawaPay : {order.failure_reason}
+                Message de {PROCESSEURS[order.provider] ?? order.provider} :{' '}
+                {order.failure_reason}
               </p>
             )}
           </Section>
@@ -321,7 +330,11 @@ function OrderDetail({
 
         <Section titre="Références">
           <Ligne label="Commande" valeur={order.id} mono />
-          <Ligne label="Dépôt pawaPay" valeur={order.deposit_id} mono />
+          {/* SebPay réconcilie sur l'identifiant de commande ci-dessus ; seul
+              pawaPay a son propre identifiant de dépôt. */}
+          {order.provider === 'pawapay' && (
+            <Ligne label="Dépôt pawaPay" valeur={order.deposit_id} mono />
+          )}
           <Ligne label="Transaction opérateur" valeur={order.provider_transaction_id} mono />
         </Section>
       </div>

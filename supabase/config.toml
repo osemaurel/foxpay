@@ -1,9 +1,12 @@
 project_id = "foxpay"
 
 # Ces fonctions sont appelées par des visiteurs non authentifiés
-# (acheteur ou serveurs pawaPay) : pas de JWT à vérifier. Leur sécurité tient
-# à ce qu'elles vérifient elles-mêmes — voir les commentaires de chaque
-# fonction.
+# (acheteur ou serveurs pawaPay et SebPay) : pas de JWT à vérifier. Leur
+# sécurité tient à ce qu'elles vérifient elles-mêmes — voir les commentaires de
+# chaque fonction.
+#
+# payment-methods n'est pas dans cette liste : elle sert l'administration, et
+# vérifie en plus le jeton elle-même pour retrouver la boutique.
 
 [functions.create-payment]
 verify_jwt = false
@@ -23,8 +26,5 @@ verify_jwt = false
 [functions.predict-phone]
 verify_jwt = false
 
-[functions.sebpay-check]
-verify_jwt = false
-
-[functions.proxy-check]
+[functions.sebpay-callback]
 verify_jwt = false

@@ -29,9 +29,25 @@ export const supabase = createClient(
 
 /** Appelle une Edge Function et remonte le message d'erreur du serveur. */
 export async function callFunction<T>(name: string, body: unknown): Promise<T> {
+  return appel(name, body, {})
+}
+
+/**
+ * Même chose, mais en présentant le jeton de la session : la fonction sait
+ * alors qui appelle. Réservé aux écrans d'administration.
+ */
+export async function callFunctionAuth<T>(name: string, body: unknown): Promise<T> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error('Session expirée. Reconnecte-toi.')
+
+  return appel(name, body, { Authorization: `Bearer ${token}` })
+}
+
+async function appel<T>(name: string, body: unknown, extra: HeadersInit): Promise<T> {
   const res = await fetch(`${url}/functions/v1/${name}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: anonKey },
+    headers: { 'Content-Type': 'application/json', apikey: anonKey, ...extra },
     body: JSON.stringify(body),
   })
   const json = await res.json().catch(() => ({}))

@@ -1,20 +1,15 @@
 import { admin } from '../_shared/admin.ts'
+import { catalogueUnifie, resolveurDeRoutage, type Methode } from '../_shared/catalogue.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { detectCountry } from '../_shared/geo.ts'
-import {
-  formatAmount,
-  getActiveConf,
-  priceForCountry,
-  type ShopCurrency,
-  withFee,
-} from '../_shared/pawapay.ts'
+import { formatAmount, priceForCountry, type ShopCurrency, withFee } from '../_shared/pawapay.ts'
 
 /**
  * Ce que la page de paiement a besoin de savoir : dans quels pays cette
  * boutique peut encaisser, avec quels opérateurs, et combien l'acheteur paiera
  * chez lui.
  *
- * La liste vient de la configuration réelle du compte pawaPay, pas d'une liste
+ * La liste vient des catalogues réels des deux processeurs, pas d'une liste
  * écrite en dur : un opérateur activé ou coupé apparaît ou disparaît tout seul.
  * On ne garde que les pays dont on sait fixer le prix — proposer un pays sans
  * savoir quel montant y demander reviendrait à afficher un prix faux.
@@ -48,7 +43,7 @@ Deno.serve(async (req) => {
   // Tout ce qui ne dépend que de shop.id part ensemble. Cette page est la
   // première chose que voit l'acheteur : chaque aller-retour en série se lit
   // comme une lenteur de la boutique.
-  const [productResult, extrasResult, confResult, detected] = await Promise.all([
+  const [productResult, extrasResult, catalogue, routage, detected] = await Promise.all([
     body.product_slug
       ? query.eq('slug', body.product_slug).maybeSingle()
       : query.order('position').order('created_at').limit(1).maybeSingle(),
@@ -57,10 +52,8 @@ Deno.serve(async (req) => {
       .select('currency, rate, decimals, round_to')
       .eq('shop_id', shop.id)
       .eq('is_active', true),
-    getActiveConf().catch((e) => {
-      console.error('payment-options: active-conf', e)
-      return null
-    }),
+    catalogueUnifie(),
+    resolveurDeRoutage(shop.id),
     // La géolocalisation est accessoire : son échec ne fait jamais échouer
     // la page, l'acheteur choisira son pays lui-même.
     detectCountry(req).catch(() => null),
@@ -68,63 +61,77 @@ Deno.serve(async (req) => {
 
   const product = productResult.data
   if (!product) return fail("Ce produit n'est pas en vente", 404)
+  if (catalogue.length === 0) {
+    return fail('Les moyens de paiement sont momentanément indisponibles.', 502)
+  }
 
-  if (!confResult) return fail('Les moyens de paiement sont momentanément indisponibles.', 502)
-  const conf = confResult
   const extras = (extrasResult.data ?? []) as ShopCurrency[]
+
+  // Regroupé par pays : l'acheteur choisit d'abord où il est, ensuite comment
+  // il paie.
+  const parPays = new Map<string, Methode[]>()
+  for (const m of catalogue) {
+    const liste = parPays.get(m.country) ?? []
+    liste.push(m)
+    parPays.set(m.country, liste)
+  }
 
   const countries = []
 
-  for (const country of conf) {
+  for (const [code, methodes] of parPays) {
     // Deux passages dans la même conversion : le prix seul, puis le prix majoré
     // des frais. Les frais sont la différence des deux, donc l'addition affichée
     // à l'acheteur tombe juste même après arrondi.
-    const base = priceForCountry(country.country, product.price, extras)
-    const priced = priceForCountry(country.country, withFee(product.price), extras)
+    const base = priceForCountry(code, product.price, extras)
+    const priced = priceForCountry(code, withFee(product.price), extras)
     if (!base || !priced) continue
 
-    const retenus = country.providers.filter(
-      (p) => p.currency === priced.currency && p.deposit.status !== 'CLOSED',
-    )
+    const providers = []
 
-    const providers = retenus.map((p) => ({
-        provider: p.provider,
-        name: p.displayName,
-        logo: p.logo,
-        // Le montant dépend de l'opérateur : tous n'acceptent pas les décimales.
-        amount: formatAmount(priced.amount, p.deposit.decimalsInAmount),
-        auth_type: p.deposit.authType,
-        pin_prompt: p.deposit.pinPrompt,
-        pin_prompt_revivable: p.deposit.pinPromptRevivable,
-        instructions: p.deposit.instructions,
-        // Le nom qui s'affichera sur l'invite de code PIN. Le montrer d'avance
-        // évite que l'acheteur prenne la demande pour une tentative d'arnaque.
-        merchant_name: p.nameDisplayedToCustomer || null,
-      }))
+    for (const m of methodes) {
+      // La devise du pays chez le processeur doit être celle qu'on sait
+      // facturer : un opérateur qui n'encaisse qu'en naira n'a rien à faire
+      // dans une boutique qui vend en franc CFA.
+      if (m.currency !== priced.currency) continue
 
-    if (providers.length > 0) {
-      // Le prix barré suit la même conversion que le total — sans quoi le
-      // récapitulatif mélangerait deux monnaies — mais pas les frais : ceux-ci
-      // ont leur propre ligne, et seraient sinon comptés deux fois.
-      const compare = product.compare_at_price
-        ? priceForCountry(country.country, product.compare_at_price, extras)
-        : null
+      const processeur = routage(m)
+      if (!processeur) continue
+      if (processeur === 'pawapay' && m.pawapay?.status === 'CLOSED') continue
 
-      const decimales = retenus[0].deposit.decimalsInAmount
+      const decimals = processeur === 'pawapay' ? (m.pawapay?.decimals ?? 'NONE') : 'NONE'
 
-      countries.push({
-        country: country.country,
-        name: country.name,
-        prefix: country.prefix,
-        flag: country.flag,
-        currency: priced.currency,
-        // Le récapitulatif détaille le total : le prix, puis les frais.
-        base_amount: formatAmount(base.amount, decimales),
-        fee_amount: formatAmount(priced.amount - base.amount, decimales),
-        compare_amount: compare ? formatAmount(compare.amount, decimales) : null,
-        providers,
+      providers.push({
+        // Le slug canonique, pas le code d'un processeur : la page n'a pas à
+        // savoir lequel des deux traitera le paiement.
+        provider: m.method,
+        name: m.name,
+        logo: m.logo,
+        amount: formatAmount(priced.amount, decimals),
+        ...detailsAuthentification(m, processeur),
       })
     }
+
+    if (providers.length === 0) continue
+
+    // Le prix barré suit la même conversion que le total — sans quoi le
+    // récapitulatif mélangerait deux monnaies — mais pas les frais : ceux-ci
+    // ont leur propre ligne, et seraient sinon comptés deux fois.
+    const compare = product.compare_at_price
+      ? priceForCountry(code, product.compare_at_price, extras)
+      : null
+
+    const premier = methodes[0]
+    countries.push({
+      country: code,
+      name: premier.countryName,
+      prefix: premier.prefix,
+      flag: methodes.find((m) => m.flag)?.flag ?? null,
+      currency: priced.currency,
+      base_amount: formatAmount(base.amount, 'NONE'),
+      fee_amount: formatAmount(priced.amount - base.amount, 'NONE'),
+      compare_amount: compare ? formatAmount(compare.amount, 'NONE') : null,
+      providers,
+    })
   }
 
   countries.sort((a, b) => a.name.localeCompare(b.name, 'fr'))
@@ -135,3 +142,46 @@ Deno.serve(async (req) => {
 
   return json({ countries, detected: vendable ? detected : null })
 })
+
+/**
+ * Comment l'acheteur autorisera le paiement, exprimé dans le vocabulaire que la
+ * page connaît déjà — celui de pawaPay. SebPay décrit la même chose autrement :
+ * un opérateur à OTP est un opérateur à préautorisation, et son code USSD tient
+ * lieu d'instructions.
+ */
+function detailsAuthentification(m: Methode, processeur: 'pawapay' | 'sebpay') {
+  if (processeur === 'pawapay' && m.pawapay) {
+    return {
+      auth_type: m.pawapay.authType,
+      pin_prompt: m.pawapay.pinPrompt,
+      pin_prompt_revivable: m.pawapay.pinPromptRevivable,
+      instructions: m.pawapay.instructions,
+      merchant_name: m.pawapay.merchantName,
+    }
+  }
+
+  const seb = m.sebpay!
+  return {
+    auth_type: seb.otpRequired ? 'PREAUTH' : 'PROVIDER_AUTH',
+    pin_prompt: seb.otpRequired ? null : 'AUTOMATIC',
+    pin_prompt_revivable: false,
+    instructions: seb.ussdCode
+      ? {
+          channels: [
+            {
+              type: 'USSD',
+              displayName: { fr: 'Pour obtenir ton code de validation' },
+              quickLink: seb.ussdCode,
+              instructions: {
+                fr: [
+                  { text: `Compose ${seb.ussdCode} sur ton téléphone` },
+                  { text: 'Note le code reçu par SMS' },
+                ],
+              },
+            },
+          ],
+        }
+      : null,
+    merchant_name: null,
+  }
+}

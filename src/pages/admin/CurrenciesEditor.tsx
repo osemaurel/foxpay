@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatPrice } from '../../lib/format'
-import { Alert, Button, Card, Field, inputClass } from '../../components/ui'
+import { Alert, Button, Card, Field, Spinner, inputClass } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
 /**
@@ -106,7 +106,13 @@ export default function CurrenciesEditor() {
     setBusy(false)
   }
 
-  if (loading) return <Card title="Vendre en RDC">Chargement…</Card>
+  if (loading) {
+    return (
+      <Card title="Vendre en RDC">
+        <Spinner label="Chargement du taux de conversion…" />
+      </Card>
+    )
+  }
 
   const config = choix ? OPTIONS[choix] : null
   const exemple = products.find((p) => p.price > 0)

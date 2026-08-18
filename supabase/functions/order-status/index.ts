@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
   const { data: order } = await admin
     .from('orders')
-    .select('id, status, deposit_id, download_token, failure_code')
+    .select('id, status, download_token, failure_code, authorization_url')
     .eq('id', body.order_id)
     .maybeSingle()
 
@@ -33,16 +33,16 @@ Deno.serve(async (req) => {
 
   let status = order.status
   let failureCode: string | null = order.failure_code
-  let authorizationUrl: string | null = null
+  let authorizationUrl: string | null = order.authorization_url
 
   // Le callback peut être en retard ou perdu : on va chercher la vérité chez
-  // pawaPay tant que la commande n'est pas tranchée.
+  // le processeur tant que la commande n'est pas tranchée.
   if (status === 'pending') {
     try {
-      const outcome = await settleOrder(order.deposit_id)
+      const outcome = await settleOrder(order.id)
       if (outcome.result !== 'unknown') status = outcome.result
       failureCode = outcome.failureCode ?? failureCode
-      authorizationUrl = outcome.authorizationUrl
+      authorizationUrl = outcome.authorizationUrl ?? authorizationUrl
     } catch (e) {
       // On répond quand même 'pending' : la page réessaiera.
       console.error('order-status', e)
