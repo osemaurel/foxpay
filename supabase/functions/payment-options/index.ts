@@ -1,5 +1,5 @@
 import { admin } from '../_shared/admin.ts'
-import { catalogueUnifie, resolveurDeRoutage, type Methode } from '../_shared/catalogue.ts'
+import { catalogueUnifie, resolveurDeMethodes, type Methode } from '../_shared/catalogue.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { detectCountry } from '../_shared/geo.ts'
 import { formatAmount, priceForCountry, type ShopCurrency, withFee } from '../_shared/pawapay.ts'
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
   // Tout ce qui ne dépend que de shop.id part ensemble. Cette page est la
   // première chose que voit l'acheteur : chaque aller-retour en série se lit
   // comme une lenteur de la boutique.
-  const [productResult, extrasResult, catalogue, routage, detected] = await Promise.all([
+  const [productResult, extrasResult, catalogue, reglage, detected] = await Promise.all([
     body.product_slug
       ? query.eq('slug', body.product_slug).maybeSingle()
       : query.order('position').order('created_at').limit(1).maybeSingle(),
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       .eq('shop_id', shop.id)
       .eq('is_active', true),
     catalogueUnifie(),
-    resolveurDeRoutage(shop.id),
+    resolveurDeMethodes(shop.id),
     // La géolocalisation est accessoire : son échec ne fait jamais échouer
     // la page, l'acheteur choisira son pays lui-même.
     detectCountry(req).catch(() => null),
@@ -94,8 +94,10 @@ Deno.serve(async (req) => {
       // dans une boutique qui vend en franc CFA.
       if (m.currency !== priced.currency) continue
 
-      const processeur = routage(m)
-      if (!processeur) continue
+      // Une méthode retirée par le vendeur n'apparaît pas : c'est tout l'objet
+      // du réglage, épurer la page de paiement de ce qui ne sert pas ici.
+      const { processeur, active } = reglage(m)
+      if (!active || !processeur) continue
       if (processeur === 'pawapay' && m.pawapay?.status === 'CLOSED') continue
 
       const decimals = processeur === 'pawapay' ? (m.pawapay?.decimals ?? 'NONE') : 'NONE'

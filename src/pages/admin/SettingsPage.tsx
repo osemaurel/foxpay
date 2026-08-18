@@ -5,7 +5,7 @@ import { slugify } from '../../lib/slug'
 import type { Shop } from '../../lib/types'
 import { Alert, Button, Card, Field, ImagePicker, inputClass } from '../../components/ui'
 import CurrenciesEditor from './CurrenciesEditor'
-import RoutingEditor from './RoutingEditor'
+import PaymentMethodsEditor from './PaymentMethodsEditor'
 import { useAdmin } from './AdminLayout'
 
 export default function SettingsPage() {
@@ -197,7 +197,7 @@ export default function SettingsPage() {
       </form>
 
       <CurrenciesEditor />
-      <RoutingEditor />
+      <PaymentMethodsEditor />
     </>
   )
 }

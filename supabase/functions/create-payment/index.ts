@@ -1,9 +1,9 @@
 import { admin, requireEnv, SITE_URL } from '../_shared/admin.ts'
 import {
   catalogueUnifie,
-  resolveurDeRoutage,
+  resolveurDeMethodes,
   type Methode,
-  type Processeur,
+  type Verdict,
 } from '../_shared/catalogue.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { describeFailure } from '../_shared/failures.ts'
@@ -98,9 +98,9 @@ Deno.serve(async (req) => {
   // ---- Qui encaisse, et sous quel identifiant ------------------------------
 
   let catalogue: Methode[]
-  let routage: (m: Methode) => Processeur | null
+  let reglage: (m: Methode) => Verdict
   try {
-    ;[catalogue, routage] = await Promise.all([catalogueUnifie(), resolveurDeRoutage(shop.id)])
+    ;[catalogue, reglage] = await Promise.all([catalogueUnifie(), resolveurDeMethodes(shop.id)])
   } catch (e) {
     console.error('create-payment: catalogue', e)
     return fail('Les moyens de paiement sont momentanément indisponibles.', 502)
@@ -109,8 +109,10 @@ Deno.serve(async (req) => {
   const methode = catalogue.find((m) => m.country === country && m.method === choix)
   if (!methode) return fail("Cet opérateur n'est pas disponible", 400)
 
-  const processeur = routage(methode)
-  if (!processeur) return fail("Cet opérateur n'est pas disponible", 400)
+  // Une méthode retirée par le vendeur est refusée ici aussi : la page ne la
+  // propose plus, mais une requête forgée passerait sans cette vérification.
+  const { processeur, active } = reglage(methode)
+  if (!active || !processeur) return fail("Cet opérateur n'est pas disponible", 400)
   if (processeur === 'pawapay' && methode.pawapay?.status === 'CLOSED') {
     return fail(describeFailure('PROVIDER_TEMPORARILY_UNAVAILABLE'), 409)
   }

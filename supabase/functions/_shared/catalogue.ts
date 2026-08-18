@@ -270,25 +270,49 @@ export async function catalogueUnifie(): Promise<Methode[]> {
   )
 }
 
+/** Une ligne de payment_routes, réduite à ce qui sert à décider. */
+type LigneReglage = { processor: string | null; enabled: boolean }
+
+export type Verdict = {
+  /** Le processeur qui encaissera, ou null si aucun ne le peut. */
+  processeur: Processeur | null
+  /** Faux quand le vendeur a retiré cette méthode de sa boutique. */
+  active: boolean
+}
+
 /**
- * Le routage choisi par le vendeur, méthode par méthode.
- * Renvoie une fonction de résolution qui applique le défaut quand rien n'a été
- * choisi — pawaPay d'abord.
+ * Les réglages du vendeur, méthode par méthode : proposée ou non, et par quel
+ * processeur.
+ *
+ * Une méthode sans ligne enregistrée est proposée, chez le processeur par
+ * défaut — une boutique neuve encaisse partout sans rien régler.
  */
-export async function resolveurDeRoutage(shopId: string) {
+export async function resolveurDeMethodes(shopId: string) {
   const { data } = await admin
     .from('payment_routes')
-    .select('country, method, processor')
+    .select('country, method, processor, enabled')
     .eq('shop_id', shopId)
 
-  const choix = new Map((data ?? []).map((r) => [`${r.country}:${r.method}`, r.processor as Processeur]))
+  const reglages = new Map<string, LigneReglage>(
+    (data ?? []).map((r) => [
+      `${r.country}:${r.method}`,
+      { processor: r.processor, enabled: r.enabled },
+    ]),
+  )
 
-  return (m: Methode): Processeur | null => {
-    const voulu = choix.get(`${m.country}:${m.method}`)
+  return (m: Methode): Verdict => {
+    const reglage = reglages.get(`${m.country}:${m.method}`)
+    const voulu = reglage?.processor as Processeur | null | undefined
+
     // Un choix qui ne correspond plus à rien — opérateur retiré du compte —
     // ne doit pas rendre la méthode impayable : on retombe sur le défaut.
-    if (voulu === 'pawapay' && m.pawapay) return 'pawapay'
-    if (voulu === 'sebpay' && m.sebpay) return 'sebpay'
-    return processeurParDefaut(m)
+    const processeur =
+      voulu === 'pawapay' && m.pawapay
+        ? 'pawapay'
+        : voulu === 'sebpay' && m.sebpay
+          ? 'sebpay'
+          : processeurParDefaut(m)
+
+    return { processeur, active: reglage?.enabled ?? true }
   }
 }
