@@ -166,6 +166,25 @@ que l'addition affichée tombe juste même après arrondi. Le prix barré, lui,
 reste le prix habituel du produit : les frais ont leur propre ligne et seraient
 sinon comptés deux fois.
 
+### Suivi publicitaire
+
+La boutique charge le pixel Meta configuré dans **Paramètres → Suivi
+publicitaire**, et lui seul : sans identifiant, aucun script tiers n'est ajouté
+à la page et rien n'est envoyé à Meta. Les événements sont `PageView`,
+`ViewContent`, `InitiateCheckout` et `Purchase` — ce dernier avec le montant
+réellement débité, frais compris, dans la devise de l'acheteur.
+
+Rien d'autre ne part : ni email, ni nom, ni numéro. Le suivi publicitaire n'en
+a pas besoin, et ces données appartiennent à l'acheteur.
+
+`Purchase` porte l'identifiant de commande comme `eventID` et n'est compté
+qu'une fois par commande, sinon un rechargement de la page de paiement — ou sa
+réouverture depuis le lien de retour — gonflerait les statistiques.
+
+L'identifiant est contraint en base à des chiffres uniquement. Ce n'est pas
+cosmétique : il est injecté dans un script sur une page publique, et n'importe
+qui peut créer une boutique.
+
 ### Ce qui n'est jamais cru sur parole
 
 Le navigateur envoie un pays, un opérateur et un numéro — pas un montant.

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Product, Review, Shop } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
+import { track } from '../../lib/pixel'
 import { Eyebrow } from '../../components/ui'
 import RichContent from '../../components/RichContent'
 import { useShop } from './ShopLayout'
@@ -29,6 +30,19 @@ export default function ProductPage() {
     )
     observer.observe(el)
     return () => observer.disconnect()
+  }, [product?.id])
+
+  // Produit consulté : l'événement qui permet à Meta de reconnaître les gens
+  // intéressés par ce produit précis, et de retrouver leurs semblables.
+  useEffect(() => {
+    if (!product) return
+    track('ViewContent', {
+      content_ids: [product.slug],
+      content_name: product.title,
+      content_type: 'product',
+      value: product.price,
+      currency: product.currency,
+    })
   }, [product?.id])
 
   if (!product) {

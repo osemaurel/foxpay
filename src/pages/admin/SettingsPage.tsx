@@ -46,13 +46,20 @@ export default function SettingsPage() {
         banner_url: form.banner_url,
         accent_color: form.accent_color,
         contact_email: form.contact_email,
+        facebook_pixel_id: form.facebook_pixel_id || null,
       })
       .eq('id', shop.id)
       .select()
       .single()
 
     if (error) {
-      setError(error.code === '23505' ? 'Ce lien est déjà pris.' : error.message)
+      setError(
+        error.code === '23505'
+          ? 'Ce lien est déjà pris.'
+          : error.code === '23514'
+            ? "L'identifiant du pixel ne doit contenir que des chiffres."
+            : error.message,
+      )
     } else {
       onShopSaved(data)
       setSaved(true)
@@ -131,6 +138,27 @@ export default function SettingsPage() {
             </div>
           </Field>
         </div>
+      </Card>
+
+      <Card title="Suivi publicitaire">
+        <p className="mb-5 text-sm leading-relaxed text-ink-muted">
+          Si tu fais de la publicité sur Facebook ou Instagram, ton pixel Meta compte ici les
+          produits consultés, les paiements commencés et les achats. Laissé vide, aucun script
+          n'est chargé sur ta boutique et rien n'est envoyé à Meta.
+        </p>
+
+        <Field
+          label="Identifiant du pixel Meta"
+          hint="Uniquement des chiffres, tel qu'il apparaît dans le gestionnaire d'événements."
+        >
+          <input
+            inputMode="numeric"
+            placeholder="Aucun"
+            value={form.facebook_pixel_id ?? ''}
+            onChange={(e) => set('facebook_pixel_id', e.target.value.replace(/\D/g, '') || null)}
+            className={inputClass}
+          />
+        </Field>
       </Card>
 
       <Card title="Paiement et contact">

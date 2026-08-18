@@ -8,6 +8,8 @@ export type Shop = {
   banner_url: string | null
   accent_color: string
   contact_email: string | null
+  /** Pixel Meta, chiffres uniquement. Vide = aucun script tiers sur la boutique. */
+  facebook_pixel_id: string | null
   created_at: string
   updated_at: string
 }

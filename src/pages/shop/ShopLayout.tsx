@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, Outlet, useOutletContext, useParams } from 'react-router-dom'
+import { Link, Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import type { Product, Shop } from '../../lib/types'
+import { initPixel, track } from '../../lib/pixel'
 import { Spinner } from '../../components/ui'
 import ThemeToggle from '../../components/ThemeToggle'
 
@@ -49,6 +50,8 @@ export default function ShopLayout() {
     void load()
   }, [slug])
 
+  usePixel(shop)
+
   if (loading) return <Spinner />
 
   if (!shop) {
@@ -87,6 +90,23 @@ export default function ShopLayout() {
       </footer>
     </div>
   )
+}
+
+/**
+ * Charge le pixel de la boutique, puis compte une vue de page à chaque
+ * navigation. Sans pixel configuré, rien de tout cela ne s'exécute.
+ */
+function usePixel(shop: Shop | null) {
+  const { pathname } = useLocation()
+  const pixel = shop?.facebook_pixel_id ?? null
+
+  useEffect(() => {
+    if (!initPixel(pixel)) return
+    // `init` n'envoie rien de lui-même : c'est bien à nous de compter la vue,
+    // à l'ouverture comme à chaque navigation interne — la boutique est une
+    // application d'une seule page, Meta ne les voit pas passer.
+    track('PageView')
+  }, [pixel, pathname])
 }
 
 /** En-tête de boutique : identité à gauche, réglages à droite, toujours visible. */

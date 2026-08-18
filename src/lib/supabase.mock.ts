@@ -41,6 +41,8 @@ const shop: Shop = {
   banner_url: BANNER,
   accent_color: '#bf854a',
   contact_email: 'bonjour@atelierkodi.ci',
+  // Aucun pixel dans l'aperçu : pas de script tiers ni d'appel vers Meta.
+  facebook_pixel_id: null,
   created_at: daysAgo(60),
   updated_at: daysAgo(2),
 }

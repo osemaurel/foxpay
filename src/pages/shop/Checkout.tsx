@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { callFunction } from '../../lib/supabase'
 import type { Product } from '../../lib/types'
 import { formatCharged, formatPrice } from '../../lib/format'
+import { track, trackPurchaseOnce } from '../../lib/pixel'
 import { Alert, Eyebrow, Field, Spinner, inputClass } from '../../components/ui'
 import { useShop } from './ShopLayout'
 
@@ -95,6 +96,19 @@ export default function Checkout() {
   const country = countries?.find((c) => c.country === countryCode) ?? null
   const provider = country?.providers.find((p) => p.provider === providerCode) ?? null
 
+  // Le montant suit le pays dès qu'il est choisi, sans attendre l'opérateur :
+  // un acheteur congolais doit voir son prix en francs congolais tout de suite.
+  // Les opérateurs d'un même pays demandent le même montant, à l'arrondi près.
+  const payable = provider?.amount ?? country?.providers[0]?.amount ?? null
+
+  // Gardé dans une référence pour le suivi publicitaire : le montant change
+  // quand l'acheteur choisit son pays, mais le suivi du paiement ne doit pas
+  // se relancer pour autant.
+  const payableRef = useRef<{ amount: string; currency: string } | null>(null)
+  useEffect(() => {
+    if (payable && country) payableRef.current = { amount: payable, currency: country.currency }
+  }, [payable, country])
+
   useEffect(() => {
     let cancelled = false
     callFunction<{ countries: CountryOption[]; detected: string | null }>('payment-options', {
@@ -155,6 +169,20 @@ export default function Checkout() {
     return () => clearTimeout(handle)
   }, [country, localNumber, touchedProvider])
 
+  // Paiement commencé. L'événement part à l'ouverture de la page, pas au clic :
+  // c'est ici que se joue l'abandon, et Meta a besoin de connaître les deux
+  // bouts pour mesurer ce que la publicité rapporte vraiment.
+  useEffect(() => {
+    if (!product || resumed) return
+    track('InitiateCheckout', {
+      content_ids: [product.slug],
+      content_name: product.title,
+      content_type: 'product',
+      value: product.price,
+      currency: product.currency,
+    })
+  }, [product?.id, resumed])
+
   const poll = useCallback(async (id: string): Promise<StatusReply | null> => {
     try {
       return await callFunction<StatusReply>('order-status', { order_id: id })
@@ -186,6 +214,15 @@ export default function Checkout() {
       if (reply.status === 'paid') {
         setDownloadUrl(reply.download_url)
         setStage('paid')
+        // Le montant compté est celui réellement débité, dans la devise de
+        // l'acheteur. Après un rechargement de page le pays n'est plus
+        // sélectionné : on retombe alors sur le prix du produit.
+        trackPurchaseOnce(orderId!, {
+          content_ids: product ? [product.slug] : [],
+          content_type: 'product',
+          value: Number(payableRef.current?.amount ?? product?.price ?? 0),
+          currency: payableRef.current?.currency ?? product?.currency ?? 'XOF',
+        })
         return
       }
       if (reply.status === 'failed' || reply.status === 'cancelled') {
@@ -227,10 +264,6 @@ export default function Checkout() {
   }
 
   const accent = product.cta_color ?? 'var(--accent)'
-  // Le montant suit le pays dès qu'il est choisi, sans attendre l'opérateur :
-  // un acheteur congolais doit voir son prix en francs congolais tout de suite.
-  // Les opérateurs d'un même pays demandent le même montant, à l'arrondi près.
-  const payable = provider?.amount ?? country?.providers[0]?.amount ?? null
 
   async function pay(e: React.FormEvent) {
     e.preventDefault()
