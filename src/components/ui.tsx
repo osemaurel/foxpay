@@ -105,11 +105,21 @@ export function Alert({ kind, children }: { kind: 'error' | 'ok'; children: Reac
   )
 }
 
+/**
+ * Chargement. L'anneau remplace le mot « Chargement » : il dit la même chose
+ * sans occuper la place d'un texte, et prend la couleur de la boutique.
+ *
+ * Le libellé reste dans le balisage, réservé aux lecteurs d'écran — une roue
+ * qui tourne ne dit rien à qui ne la voit pas.
+ */
 export function Spinner({ label = 'Chargement…' }: { label?: string }) {
   return (
-    <p className="p-10 text-center font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
-      {label}
-    </p>
+    // `items-center` empêche le conteneur d'étirer l'anneau en hauteur :
+    // l'alignement par défaut d'une boîte flex l'allongerait sur la ligne.
+    <div role="status" aria-live="polite" className="flex items-center justify-center p-10">
+      <span className="loader" />
+      <span className="sr-only">{label}</span>
+    </div>
   )
 }
 
