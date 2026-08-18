@@ -25,3 +25,6 @@ verify_jwt = false
 
 [functions.sebpay-check]
 verify_jwt = false
+
+[functions.proxy-check]
+verify_jwt = false
