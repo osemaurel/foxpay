@@ -308,6 +308,9 @@ function OrderDetail({
                 {order.failure_reason}
               </p>
             )}
+            <div className="mt-3">
+              <EmailAcheteur order={order} kind="retry" />
+            </div>
           </Section>
         )}
 
@@ -325,7 +328,7 @@ function OrderDetail({
               label="Lien valable jusqu'au"
               valeur={order.download_expires_at ? formatDate(order.download_expires_at) : null}
             />
-            <Renvoi order={order} />
+            <EmailAcheteur order={order} kind="delivery" />
           </Section>
         )}
 
@@ -344,17 +347,21 @@ function OrderDetail({
 }
 
 /**
- * Renvoyer l'email de livraison.
+ * Écrire à l'acheteur de cette commande.
  *
- * Deux cas, et le libellé du bouton dit lequel : rattraper une vente dont
- * l'email n'est jamais parti — une panne d'envoi laisse la commande livrée à
- * moitié — ou réexpédier à un acheteur qui ne le trouve plus.
+ * Deux courriers, selon ce qu'est devenue la vente : le lien de téléchargement
+ * quand elle a abouti, une relance quand le paiement a échoué. C'est le serveur
+ * qui tranche d'après l'état de la commande ; `kind` ne sert qu'au libellé.
+ *
+ * Volontairement manuel dans les deux cas. Relancer automatiquement quelqu'un à
+ * la seconde où son paiement échoue tombe souvent sur un manque de solde, et se
+ * retourne contre la boutique.
  */
-function Renvoi({ order }: { order: Order }) {
+function EmailAcheteur({ order, kind }: { order: Order; kind: 'delivery' | 'retry' }) {
   const [etat, setEtat] = useState<'idle' | 'busy' | 'ok'>('idle')
   const [error, setError] = useState<string | null>(null)
 
-  const dejaEnvoye = Boolean(order.delivered_at)
+  const dejaEnvoye = kind === 'delivery' && Boolean(order.delivered_at)
 
   async function envoyer() {
     setEtat('busy')
@@ -369,23 +376,31 @@ function Renvoi({ order }: { order: Order }) {
   }
 
   if (etat === 'ok') {
-    return (
-      <p className="pt-1 text-sm text-go">
-        Email envoyé à {order.buyer_email}.
-      </p>
-    )
+    return <p className="text-sm text-go">Email envoyé à {order.buyer_email}.</p>
   }
 
+  const libelle =
+    kind === 'retry'
+      ? 'Envoyer un email de relance'
+      : dejaEnvoye
+        ? "Renvoyer l'email"
+        : "Envoyer l'email"
+
   return (
-    <div className="pt-1">
+    <div>
       <button
         type="button"
         onClick={envoyer}
         disabled={etat === 'busy'}
         className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink transition hover:bg-raise disabled:opacity-40"
       >
-        {etat === 'busy' ? '…' : dejaEnvoye ? "Renvoyer l'email" : "Envoyer l'email"}
+        {etat === 'busy' ? '…' : libelle}
       </button>
+      {kind === 'retry' && etat === 'idle' && !error && (
+        <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+          Un lien pour reprendre l'achat, envoyé à {order.buyer_email}.
+        </p>
+      )}
       {error && <p className="mt-2 text-xs leading-relaxed text-stop">{error}</p>}
     </div>
   )

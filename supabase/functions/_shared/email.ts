@@ -147,6 +147,57 @@ Réponds à cet email pour écrire directement à l'acheteur.</p>
 }
 
 // ============================================================
+// L'acheteur qui n'a pas abouti : la relance
+// ============================================================
+
+export type Relance = {
+  to: string
+  shopName: string
+  productTitle: string
+  /** La page de paiement du produit, pour reprendre là où il s'est arrêté. */
+  retryUrl: string
+  /** Ce qui a bloqué, dit à l'acheteur — pas le message technique. */
+  raison: string
+  contactEmail: string | null
+}
+
+/**
+ * Relance après un paiement qui n'a pas abouti.
+ *
+ * Elle est déclenchée à la main par le vendeur, jamais automatiquement : un
+ * échec mobile money vient souvent d'un solde insuffisant, et écrire à
+ * quelqu'un dès la minute où il manque d'argent se retourne contre la boutique.
+ */
+export function sendRetryEmail(r: Relance): Promise<void> {
+  return envoyer({
+    to: r.to,
+    replyTo: r.contactEmail,
+    subject: `Ton paiement n'a pas abouti : ${r.productTitle}`,
+    html: buildRetryHtml(r),
+  })
+}
+
+function buildRetryHtml(r: Relance): string {
+  return page(`
+<h1 style="margin:0 0 16px;font-size:20px">Ton paiement n'est pas passé</h1>
+<p style="color:#475569;line-height:1.6;margin:0 0 16px">
+Tu as essayé d'acheter <strong>${escapeHtml(r.productTitle)}</strong>, mais le paiement
+n'a pas abouti. <strong>Rien ne t'a été débité.</strong></p>
+<p style="color:#475569;line-height:1.6;margin:0 0 24px">${escapeHtml(r.raison)}</p>
+<a href="${r.retryUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
+padding:14px;border-radius:8px;text-decoration:none;font-weight:600">Reprendre mon achat</a>
+${
+  r.contactEmail
+    ? `<p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">Un souci ?
+Réponds à cet email ou écris à
+<a href="mailto:${escapeHtml(r.contactEmail)}">${escapeHtml(r.contactEmail)}</a>.</p>`
+    : `<p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">Un souci ?
+Réponds simplement à cet email.</p>`
+}
+<p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(r.shopName)}</p>`)
+}
+
+// ============================================================
 // Habillage commun
 // ============================================================
 
