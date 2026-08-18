@@ -22,3 +22,6 @@ verify_jwt = false
 
 [functions.predict-phone]
 verify_jwt = false
+
+[functions.sebpay-check]
+verify_jwt = false
