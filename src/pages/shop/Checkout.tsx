@@ -4,6 +4,7 @@ import { callFunction } from '../../lib/supabase'
 import type { Product } from '../../lib/types'
 import { formatCharged, formatPrice } from '../../lib/format'
 import { track, trackPurchaseOnce } from '../../lib/pixel'
+import { useLangue, type Langue } from '../../lib/i18n'
 import { Alert, Eyebrow, Field, Spinner, inputClass } from '../../components/ui'
 import { useShop } from './ShopLayout'
 
@@ -84,6 +85,7 @@ export default function Checkout() {
   const { productSlug } = useParams<{ productSlug: string }>()
   const [params, setParams] = useSearchParams()
   const { shop, products } = useShop()
+  const { langue, t } = useLangue()
   const product = products.find((p) => p.slug === productSlug)
 
   const [countries, setCountries] = useState<CountryOption[] | null>(null)
@@ -131,6 +133,9 @@ export default function Checkout() {
     callFunction<{ countries: CountryOption[]; detected: string | null }>('payment-options', {
       slug: shop.slug,
       product_slug: productSlug,
+      // Les noms de pays reviennent traduits : la liste est rechargée si
+      // l'acheteur change de langue en cours de route.
+      locale: langue,
     })
       .then((data) => {
         if (cancelled) return
@@ -149,7 +154,7 @@ export default function Checkout() {
     return () => {
       cancelled = true
     }
-  }, [shop.slug, productSlug])
+  }, [shop.slug, productSlug, langue])
 
   // Vérification du numéro pendant la frappe : l'acheteur découvre sa faute de
   // frappe tout de suite, et l'opérateur deviné lui évite un choix de plus.
@@ -238,7 +243,7 @@ export default function Checkout() {
         return
       }
       if (reply.status === 'failed' || reply.status === 'cancelled') {
-        setError(reply.message ?? "Le paiement n'a pas abouti.")
+        setError(reply.message ?? t('paiementEchoue'))
         setStage('failed')
         return
       }
@@ -264,12 +269,12 @@ export default function Checkout() {
   if (!product) {
     return (
       <main className="mx-auto max-w-3xl px-5 py-24 text-center">
-        <p className="text-ink-muted">Ce produit n'est plus disponible.</p>
+        <p className="text-ink-muted">{t('produitPlusDisponible')}</p>
         <Link
           to={`/boutique/${shop.slug}`}
           className="mt-4 inline-block text-sm text-ink-faint underline underline-offset-4 hover:text-ink"
         >
-          Voir le catalogue
+          {t('voirCatalogue')}
         </Link>
       </main>
     )
@@ -296,6 +301,10 @@ export default function Checkout() {
         provider: provider.provider,
         phone: country.prefix + localNumber,
         otp: otp || null,
+        // La langue voyage avec la commande : l'email de livraison et la page
+        // de téléchargement arriveront plus tard, quand plus personne ne sera
+        // devant cet écran pour dire dans quelle langue les écrire.
+        locale: langue,
       })
 
       // L'identifiant part dans l'URL : recharger la page ou revenir d'un
@@ -328,11 +337,11 @@ export default function Checkout() {
         to={`/boutique/${shop.slug}/p/${product.slug}`}
         className="text-sm text-ink-faint transition hover:text-ink"
       >
-        ← Retour au produit
+        {t('retourProduit')}
       </Link>
 
       <h1 className="mt-5 text-2xl font-medium text-ink sm:text-3xl">
-        {stage === 'paid' ? 'Paiement confirmé' : 'Finaliser la commande'}
+        {stage === 'paid' ? t('paiementConfirme') : t('finaliser')}
       </h1>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)] lg:items-start">
@@ -345,15 +354,15 @@ export default function Checkout() {
 
           {stage === 'failed' && (
             <section className="space-y-5 rounded-2xl border border-line bg-card p-6 sm:p-8">
-              <Eyebrow>Paiement interrompu</Eyebrow>
-              <Alert kind="error">{error ?? "Le paiement n'a pas abouti."}</Alert>
+              <Eyebrow>{t('paiementInterrompu')}</Eyebrow>
+              <Alert kind="error">{error ?? t('paiementEchoue')}</Alert>
               <button
                 type="button"
                 onClick={retry}
                 style={{ backgroundColor: accent }}
                 className="inline-flex w-full items-center justify-center rounded-xl px-6 py-3.5 font-medium text-white transition hover:brightness-110"
               >
-                Réessayer
+                {t('reessayer')}
               </button>
             </section>
           )}
@@ -363,9 +372,9 @@ export default function Checkout() {
               onSubmit={pay}
               className="space-y-5 rounded-2xl border border-line bg-card p-6 sm:p-8"
             >
-              <Eyebrow>Tes coordonnées</Eyebrow>
+              <Eyebrow>{t('tesCoordonnees')}</Eyebrow>
 
-              <Field label="Ton nom">
+              <Field label={t('tonNom')}>
                 <input
                   required
                   autoComplete="name"
@@ -375,10 +384,7 @@ export default function Checkout() {
                 />
               </Field>
 
-              <Field
-                label="Ton email"
-                hint="C'est là que le lien de téléchargement sera envoyé. Vérifie-le bien."
-              >
+              <Field label={t('tonEmail')} hint={t('emailAstuce')}>
                 <input
                   type="email"
                   required
@@ -390,23 +396,19 @@ export default function Checkout() {
               </Field>
 
               <div className="border-t border-line-soft pt-5">
-                <Eyebrow>Ton paiement mobile money</Eyebrow>
+                <Eyebrow>{t('tonPaiement')}</Eyebrow>
               </div>
 
               {loadError && <Alert kind="error">{loadError}</Alert>}
-              {!countries && !loadError && <Spinner label="Chargement des moyens de paiement…" />}
+              {!countries && !loadError && <Spinner label={t('chargementMoyens')} />}
 
-              {countries?.length === 0 && (
-                <Alert kind="error">
-                  Aucun moyen de paiement n'est disponible pour le moment.
-                </Alert>
-              )}
+              {countries?.length === 0 && <Alert kind="error">{t('aucunMoyen')}</Alert>}
 
               {countries && countries.length > 0 && (
                 <>
                   <Field
-                    label="Ton pays"
-                    hint={autoDetected ? 'Détecté automatiquement. Change-le si ce n’est pas le bon.' : undefined}
+                    label={t('tonPays')}
+                    hint={autoDetected ? t('paysDetecte') : undefined}
                   >
                     <select
                       required
@@ -419,7 +421,7 @@ export default function Checkout() {
                       }}
                       className={inputClass}
                     >
-                      <option value="">Choisis ton pays</option>
+                      <option value="">{t('choisisPays')}</option>
                       {countries.map((c) => (
                         <option key={c.country} value={c.country}>
                           {c.name}
@@ -429,10 +431,7 @@ export default function Checkout() {
                   </Field>
 
                   {country && (
-                    <Field
-                      label="Ton numéro mobile money"
-                      hint="Sans l'indicatif, il est déjà devant."
-                    >
+                    <Field label={t('tonNumero')} hint={t('numeroAstuce')}>
                       <div className="flex items-stretch gap-2">
                         <span className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-line bg-raise px-3 text-sm text-ink-muted">
                           {country.flag && (
@@ -451,14 +450,14 @@ export default function Checkout() {
                       </div>
                       {phoneState === 'bad' && (
                         <p className="mt-2 text-xs text-stop">
-                          Ce numéro ne semble pas valide pour {country.name}.
+                          {t('numeroInvalide')(country.name)}
                         </p>
                       )}
                     </Field>
                   )}
 
                   {country && (
-                    <Group label="Ton opérateur">
+                    <Group label={t('tonOperateur')}>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {country.providers.map((p) => (
                           <label
@@ -497,14 +496,14 @@ export default function Checkout() {
 
                   {provider?.auth_type === 'PREAUTH' && (
                     <Group
-                      label="Code d'autorisation"
-                      hint={`${provider.name} demande un code à générer depuis ton téléphone avant de payer.`}
+                      label={t('codeAutorisation')}
+                      hint={t('codeAutorisationAstuce')(provider.name)}
                     >
                       <Instructions set={provider.instructions} />
                       <input
                         required
                         inputMode="numeric"
-                        aria-label="Code d'autorisation"
+                        aria-label={t('codeAutorisation')}
                         value={otp}
                         onChange={(e) => setOtp(e.target.value.replace(/\s/g, ''))}
                         className={`${inputClass} mt-3`}
@@ -523,15 +522,16 @@ export default function Checkout() {
                 className="inline-flex w-full items-center justify-center rounded-xl px-6 py-3.5 font-medium text-white transition hover:brightness-110 disabled:opacity-40"
               >
                 {busy
-                  ? 'Envoi de la demande…'
-                  : payable
-                    ? `Payer ${formatCharged(payable, country!.currency)}`
-                    : `Payer ${formatPrice(product.price, product.currency)}`}
+                  ? t('envoiDemande')
+                  : t('payer')(
+                      payable
+                        ? formatCharged(payable, country!.currency, langue)
+                        : formatPrice(product.price, product.currency, langue),
+                    )}
               </button>
 
               <p className="text-center text-xs leading-relaxed text-ink-faint">
-                Une demande de paiement arrivera sur ton téléphone. Rien n'est débité avant que
-                tu ne composes ton code PIN.
+                {t('rassurance')}
               </p>
             </form>
           )}
@@ -592,11 +592,12 @@ function Waiting({
   timedOut: boolean
   onRetry: () => void
 }) {
+  const { t } = useLangue()
   const manual = provider?.pin_prompt === 'MANUAL'
 
   return (
     <section className="space-y-5 rounded-2xl border border-line bg-card p-6 sm:p-8">
-      <Eyebrow>En attente de ta confirmation</Eyebrow>
+      <Eyebrow>{t('attenteTitre')}</Eyebrow>
 
       {!timedOut && (
         <>
@@ -607,15 +608,13 @@ function Waiting({
             />
             <div className="space-y-2">
               <p className="font-medium text-ink">
-                {manual
-                  ? 'Suis les étapes ci-dessous sur ton téléphone.'
-                  : 'Une demande de code PIN arrive sur ton téléphone.'}
+                {manual ? t('suisLesEtapes') : t('demandePin')}
               </p>
               <p className="text-sm leading-relaxed text-ink-muted">
                 {provider?.merchant_name
-                  ? `Elle s'affiche au nom de « ${provider.merchant_name} ». Compose ton code PIN pour valider.`
-                  : 'Compose ton code PIN pour valider le paiement.'}{' '}
-                Cette page se met à jour toute seule, ne la ferme pas.
+                  ? t('auNomDe')(provider.merchant_name)
+                  : t('composePin')}{' '}
+                {t('neFermePas')}
               </p>
             </div>
           </div>
@@ -630,17 +629,13 @@ function Waiting({
 
       {timedOut && (
         <>
-          <p className="text-sm leading-relaxed text-ink-muted">
-            Toujours rien après cinq minutes. L'invite de code PIN a probablement expiré. Si tu
-            as bien payé, l'email de téléchargement arrivera quand même — vérifie ta boîte de
-            réception.
-          </p>
+          <p className="text-sm leading-relaxed text-ink-muted">{t('expire')}</p>
           <button
             type="button"
             onClick={onRetry}
             className="inline-flex w-full items-center justify-center rounded-xl border border-line px-6 py-3 font-medium text-ink transition hover:bg-raise"
           >
-            Recommencer le paiement
+            {t('recommencer')}
           </button>
         </>
       )}
@@ -658,17 +653,26 @@ function dialLink(quickLink: string): string {
   return `tel:${code.replace(/#/g, '%23')}`
 }
 
-/** Étapes fournies par pawaPay pour l'opérateur choisi (composer *144#, etc.). */
+/**
+ * Étapes fournies par pawaPay pour l'opérateur choisi (composer *144#, etc.).
+ *
+ * Le processeur les fournit déjà dans les deux langues : on prend celle de
+ * l'acheteur, et l'autre en secours — mieux vaut des instructions dans la
+ * mauvaise langue que pas d'instructions du tout.
+ */
 function Instructions({ set }: { set: InstructionSet | null }) {
+  const { langue, t } = useLangue()
+  const autre: Langue = langue === 'fr' ? 'en' : 'fr'
+
   const channel = set?.channels?.[0]
-  const steps = channel?.instructions?.fr ?? channel?.instructions?.en ?? []
+  const steps = channel?.instructions?.[langue] ?? channel?.instructions?.[autre] ?? []
   if (steps.length === 0) return null
+
+  const titre = channel?.displayName?.[langue] ?? channel?.displayName?.[autre]
 
   return (
     <div className="space-y-2">
-      {channel?.displayName?.fr && (
-        <p className="text-xs font-medium text-ink">{channel.displayName.fr}</p>
-      )}
+      {titre && <p className="text-xs font-medium text-ink">{titre}</p>}
       <ol className="list-inside list-decimal space-y-1 text-sm text-ink-muted">
         {steps.map((step, i) => (
           <li key={i}>{step.text}</li>
@@ -679,7 +683,7 @@ function Instructions({ set }: { set: InstructionSet | null }) {
           href={dialLink(channel.quickLink)}
           className="inline-block text-sm underline underline-offset-4 hover:text-ink"
         >
-          Composer depuis ce téléphone
+          {t('composerIci')}
         </a>
       )}
     </div>
@@ -695,19 +699,20 @@ function Paid({
   downloadUrl: string | null
   email: string
 }) {
+  const { t } = useLangue()
+
   return (
     <section className="space-y-5 rounded-2xl border border-line bg-card p-6 sm:p-8">
-      <Eyebrow>C'est réglé</Eyebrow>
+      <Eyebrow>{t('cestRegle')}</Eyebrow>
       <p className="text-sm leading-relaxed text-ink-muted">
-        Merci&nbsp;! Ton paiement est confirmé et « {product.title} » t'attend. Le lien a aussi
-        été envoyé{email ? ` à ${email}` : ' par email'}, tu peux y revenir pendant 7&nbsp;jours.
+        {t('merciAchat')(product.title, email)}
       </p>
       {downloadUrl && (
         <a
           href={downloadUrl}
           className="inline-flex w-full items-center justify-center rounded-xl bg-ink px-6 py-3.5 font-medium text-canvas transition hover:opacity-90"
         >
-          Télécharger maintenant
+          {t('telechargerMaintenant')}
         </a>
       )}
     </section>
@@ -729,6 +734,7 @@ function Summary({
     currency: string
   } | null
 }) {
+  const { langue, t } = useLangue()
   const discount =
     product.compare_at_price && product.compare_at_price > product.price
       ? Math.round((1 - product.price / product.compare_at_price) * 100)
@@ -736,7 +742,7 @@ function Summary({
 
   return (
     <section className="rounded-2xl border border-line bg-raise p-5">
-      <Eyebrow>Ta commande</Eyebrow>
+      <Eyebrow>{t('taCommande')}</Eyebrow>
 
       <div className="mt-4 flex gap-4">
         {product.cover_url && (
@@ -752,42 +758,42 @@ function Summary({
       <div className="mt-5 space-y-2 border-t border-line-soft pt-4 text-sm">
         {charged && (
           <div className="flex items-center justify-between text-ink-muted">
-            <span>Le produit</span>
+            <span>{t('leProduit')}</span>
             <span className="tabular-nums">
-              {formatCharged(charged.base, charged.currency)}
+              {formatCharged(charged.base, charged.currency, langue)}
             </span>
           </div>
         )}
         {product.compare_at_price && (
           <div className="flex items-center justify-between text-ink-faint">
-            <span>Prix habituel</span>
+            <span>{t('prixHabituel')}</span>
             <span className="tabular-nums line-through">
               {charged?.compare
-                ? formatCharged(charged.compare, charged.currency)
-                : formatPrice(product.compare_at_price, product.currency)}
+                ? formatCharged(charged.compare, charged.currency, langue)
+                : formatPrice(product.compare_at_price, product.currency, langue)}
             </span>
           </div>
         )}
         {discount !== null && (
           <div className="flex items-center justify-between text-go">
-            <span>Remise</span>
+            <span>{t('remise')}</span>
             <span className="tabular-nums">−{discount} %</span>
           </div>
         )}
         {charged && (
           <div className="flex items-center justify-between text-ink-muted">
-            <span>Frais de paiement</span>
+            <span>{t('fraisPaiement')}</span>
             <span className="tabular-nums">
-              + {formatCharged(charged.fee, charged.currency)}
+              + {formatCharged(charged.fee, charged.currency, langue)}
             </span>
           </div>
         )}
         <div className="flex items-baseline justify-between pt-1">
-          <span className="font-medium text-ink">Total</span>
+          <span className="font-medium text-ink">{t('total')}</span>
           <span className="text-xl font-medium tabular-nums" style={{ color: accent }}>
             {charged
-              ? formatCharged(charged.amount, charged.currency)
-              : formatPrice(product.price, product.currency)}
+              ? formatCharged(charged.amount, charged.currency, langue)
+              : formatPrice(product.price, product.currency, langue)}
           </span>
         </div>
       </div>

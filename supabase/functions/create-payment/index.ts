@@ -1,12 +1,14 @@
 import { admin, requireEnv, SITE_URL } from '../_shared/admin.ts'
 import {
   catalogueUnifie,
+  nomPays,
   resolveurDeMethodes,
   type Methode,
   type Verdict,
 } from '../_shared/catalogue.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { describeFailure } from '../_shared/failures.ts'
+import { lireLangue, type Langue } from '../_shared/langue.ts'
 import {
   createDeposit,
   DepositRejected,
@@ -37,7 +39,63 @@ type Body = {
   provider?: string
   /** Code à usage unique, pour les opérateurs qui en exigent un. */
   otp?: string
+  /** La langue que lit l'acheteur, détectée par la page de paiement. */
+  locale?: string
 }
+
+/**
+ * Les refus que voit l'acheteur, dans sa langue.
+ *
+ * Ce ne sont pas des erreurs techniques : chacun lui dit ce qu'il peut corriger
+ * sur le formulaire. Les vrais échecs de paiement, eux, passent par
+ * describeFailure(). Ce qui reste en français ici — corps JSON illisible,
+ * méthode HTTP interdite — n'arrive jamais depuis la page de paiement.
+ */
+const MESSAGES = {
+  boutiqueManquante: { fr: 'Boutique manquante', en: 'Missing shop' },
+  nomRequis: { fr: 'Ton nom est nécessaire', en: 'Your name is required' },
+  emailInvalide: { fr: 'Cet email est invalide', en: 'This email address is invalid' },
+  paysEtOperateur: {
+    fr: 'Choisis ton pays et ton opérateur',
+    en: 'Choose your country and your provider',
+  },
+  numeroRequis: {
+    fr: 'Ton numéro mobile money est nécessaire',
+    en: 'Your mobile money number is required',
+  },
+  boutiqueIntrouvable: { fr: 'Boutique introuvable', en: 'Shop not found' },
+  produitPasEnVente: { fr: "Ce produit n'est pas en vente", en: "This product isn't on sale" },
+  produitMalConfigure: { fr: 'Produit mal configuré', en: 'This product is misconfigured' },
+  moyensIndisponibles: {
+    fr: 'Les moyens de paiement sont momentanément indisponibles.',
+    en: 'Payment methods are temporarily unavailable.',
+  },
+  operateurIndisponible: {
+    fr: "Cet opérateur n'est pas disponible",
+    en: "This provider isn't available",
+  },
+  pasEnVenteIci: {
+    fr: "Ce produit n'est pas en vente dans ce pays",
+    en: "This product isn't on sale in that country",
+  },
+  otpRequis: {
+    fr: "Cet opérateur demande un code d'autorisation avant le paiement",
+    en: 'This provider requires an authorisation code before payment',
+  },
+  numeroInverifiable: {
+    fr: 'Impossible de vérifier ce numéro. Réessaie dans un instant.',
+    en: "We couldn't check this number. Try again in a moment.",
+  },
+  numeroInvalide: { fr: "Ce numéro n'est pas valide", en: 'This number is not valid' },
+  pasDuPays: {
+    fr: (pays: string) => `Ce numéro n'est pas un numéro ${pays}`,
+    en: (pays: string) => `This isn't a ${pays} number`,
+  },
+  commandeImpossible: {
+    fr: (raison: string) => `Création de la commande impossible : ${raison}`,
+    en: (raison: string) => `Could not create the order: ${raison}`,
+  },
+} as const
 
 type Product = {
   id: string
@@ -66,12 +124,19 @@ Deno.serve(async (req) => {
   const country = body.country?.trim().toUpperCase()
   const choix = body.provider?.trim()
   const phone = body.phone?.trim()
+  const langue = lireLangue(body.locale)
 
-  if (!slug) return fail('Boutique manquante')
-  if (!name) return fail('Ton nom est nécessaire')
-  if (!email || !EMAIL.test(email)) return fail('Cet email est invalide')
-  if (!country || !choix) return fail('Choisis ton pays et ton opérateur')
-  if (!phone) return fail('Ton numéro mobile money est nécessaire')
+  // Le type de retour est celui de la version française : les deux versions
+  // ayant la même forme, une entrée à paramètre reste une fonction typée.
+  function dire<K extends keyof typeof MESSAGES>(cle: K): (typeof MESSAGES)[K]['fr'] {
+    return MESSAGES[cle][langue] as (typeof MESSAGES)[K]['fr']
+  }
+
+  if (!slug) return fail(dire('boutiqueManquante'))
+  if (!name) return fail(dire('nomRequis'))
+  if (!email || !EMAIL.test(email)) return fail(dire('emailInvalide'))
+  if (!country || !choix) return fail(dire('paysEtOperateur'))
+  if (!phone) return fail(dire('numeroRequis'))
 
   const { data: shop } = await admin
     .from('shops')
@@ -79,7 +144,7 @@ Deno.serve(async (req) => {
     .eq('slug', slug)
     .maybeSingle()
 
-  if (!shop) return fail('Boutique introuvable', 404)
+  if (!shop) return fail(dire('boutiqueIntrouvable'), 404)
 
   const query = admin
     .from('products')
@@ -92,8 +157,8 @@ Deno.serve(async (req) => {
     : await query.order('position').order('created_at').limit(1).maybeSingle()
 
   const item = found as Product | null
-  if (!item) return fail("Ce produit n'est pas en vente", 404)
-  if (item.price <= 0) return fail('Produit mal configuré', 409)
+  if (!item) return fail(dire('produitPasEnVente'), 404)
+  if (item.price <= 0) return fail(dire('produitMalConfigure'), 409)
 
   // ---- Qui encaisse, et sous quel identifiant ------------------------------
 
@@ -103,18 +168,18 @@ Deno.serve(async (req) => {
     ;[catalogue, reglage] = await Promise.all([catalogueUnifie(), resolveurDeMethodes(shop.id)])
   } catch (e) {
     console.error('create-payment: catalogue', e)
-    return fail('Les moyens de paiement sont momentanément indisponibles.', 502)
+    return fail(dire('moyensIndisponibles'), 502)
   }
 
   const methode = catalogue.find((m) => m.country === country && m.method === choix)
-  if (!methode) return fail("Cet opérateur n'est pas disponible", 400)
+  if (!methode) return fail(dire('operateurIndisponible'), 400)
 
   // Une méthode retirée par le vendeur est refusée ici aussi : la page ne la
   // propose plus, mais une requête forgée passerait sans cette vérification.
   const { processeur, active } = reglage(methode)
-  if (!active || !processeur) return fail("Cet opérateur n'est pas disponible", 400)
+  if (!active || !processeur) return fail(dire('operateurIndisponible'), 400)
   if (processeur === 'pawapay' && methode.pawapay?.status === 'CLOSED') {
-    return fail(describeFailure('PROVIDER_TEMPORARILY_UNAVAILABLE'), 409)
+    return fail(describeFailure('PROVIDER_TEMPORARILY_UNAVAILABLE', langue), 409)
   }
 
   // ---- Le montant ---------------------------------------------------------
@@ -129,7 +194,7 @@ Deno.serve(async (req) => {
 
   const priced = priceForCountry(country, withFee(item.price), (extras ?? []) as ShopCurrency[])
   if (!priced || priced.currency !== methode.currency) {
-    return fail("Ce produit n'est pas en vente dans ce pays", 400)
+    return fail(dire('pasEnVenteIci'), 400)
   }
 
   const decimals = processeur === 'pawapay' ? (methode.pawapay!.decimals) : 'NONE'
@@ -138,7 +203,7 @@ Deno.serve(async (req) => {
   if (processeur === 'pawapay') {
     const { minAmount, maxAmount } = methode.pawapay!
     if ((minAmount && Number(amount) < minAmount) || (maxAmount && Number(amount) > maxAmount)) {
-      return fail(describeFailure('AMOUNT_OUT_OF_BOUNDS'), 409)
+      return fail(describeFailure('AMOUNT_OUT_OF_BOUNDS', langue), 409)
     }
   }
 
@@ -149,7 +214,7 @@ Deno.serve(async (req) => {
       : Boolean(methode.sebpay!.otpRequired)
 
   if (otpRequis && !otp) {
-    return fail("Cet opérateur demande un code d'autorisation avant le paiement")
+    return fail(dire('otpRequis'))
   }
 
   // ---- Le numéro ----------------------------------------------------------
@@ -164,12 +229,12 @@ Deno.serve(async (req) => {
       prediction = await predictProvider(phone)
     } catch (e) {
       console.error('create-payment: predict-provider', e)
-      return fail('Impossible de vérifier ce numéro. Réessaie dans un instant.', 502)
+      return fail(dire('numeroInverifiable'), 502)
     }
 
-    if (!prediction) return fail("Ce numéro n'est pas valide")
+    if (!prediction) return fail(dire('numeroInvalide'))
     if (prediction.country !== country) {
-      return fail(`Ce numéro n'est pas un numéro ${methode.countryName}`)
+      return fail(dire('pasDuPays')(nomPays(country, langue, methode.countryName)))
     }
     numero = prediction.phoneNumber
   } else {
@@ -177,7 +242,7 @@ Deno.serve(async (req) => {
     // ici rejetterait des numéros togolais parfaitement valides. On se contente
     // donc de la forme — indicatif du pays choisi, longueur plausible.
     const propre = normaliserNumero(phone, methode.prefix)
-    if (!propre) return fail(`Ce numéro n'est pas un numéro ${methode.countryName}`)
+    if (!propre) return fail(dire('pasDuPays')(nomPays(country, langue, methode.countryName)))
     numero = propre
   }
 
@@ -198,6 +263,7 @@ Deno.serve(async (req) => {
       charged_amount: Number(amount),
       charged_currency: priced.currency,
       country,
+      locale: langue,
       provider: processeur,
       // L'identifiant réellement envoyé au processeur, pas le slug interne :
       // c'est lui qui permet de retrouver la transaction chez eux.
@@ -206,11 +272,11 @@ Deno.serve(async (req) => {
     .select('id, deposit_id')
     .single()
 
-  if (orderError) return fail(`Création de la commande impossible : ${orderError.message}`, 500)
+  if (orderError) return fail(dire('commandeImpossible')(orderError.message), 500)
 
   return processeur === 'pawapay'
-    ? await payerPawapay({ order, methode, amount, currency: priced.currency, numero, otp, item, shop })
-    : await payerSebpay({ order, methode, amount, currency: priced.currency, numero, otp })
+    ? await payerPawapay({ order, methode, amount, currency: priced.currency, numero, otp, langue, item, shop })
+    : await payerSebpay({ order, methode, amount, currency: priced.currency, numero, otp, langue })
 })
 
 /**
@@ -235,6 +301,7 @@ type Contexte = {
   currency: string
   numero: string
   otp: string | null
+  langue: Langue
 }
 
 async function payerPawapay(
@@ -265,7 +332,7 @@ async function payerPawapay(
     if (e instanceof DepositRejected) {
       await marquerEchec(order.id, e.code, e.message)
       console.warn('create-payment: rejet pawapay', e.code, e.message)
-      return json({ error: describeFailure(e.code), failure_code: e.code }, 409)
+      return json({ error: describeFailure(e.code, ctx.langue), failure_code: e.code }, 409)
     }
 
     // Panne réseau ou réponse illisible : on ne sait pas si le dépôt est parti.
@@ -326,7 +393,10 @@ async function payerSebpay(ctx: Contexte): Promise<Response> {
       // bloqué. L'acheteur peut corriger, il faut donc le lui dire tout de suite.
       await marquerEchec(order.id, 'PAYMENT_REJECTED', e.message)
       console.warn('create-payment: rejet sebpay', e.status, e.message)
-      return json({ error: describeFailure('PAYMENT_REJECTED'), failure_code: 'PAYMENT_REJECTED' }, 409)
+      return json(
+        { error: describeFailure('PAYMENT_REJECTED', ctx.langue), failure_code: 'PAYMENT_REJECTED' },
+        409,
+      )
     }
 
     // Comme chez pawaPay : sans réponse claire, on ne conclut pas à l'échec.

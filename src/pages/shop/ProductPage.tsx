@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { Product, Review, Shop } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
 import { track } from '../../lib/pixel'
+import { useLangue } from '../../lib/i18n'
 import { Eyebrow } from '../../components/ui'
 import RichContent from '../../components/RichContent'
 import { useShop } from './ShopLayout'
@@ -11,6 +12,7 @@ import { useShop } from './ShopLayout'
 export default function ProductPage() {
   const { productSlug } = useParams<{ productSlug: string }>()
   const { shop, products } = useShop()
+  const { t } = useLangue()
   const product = products.find((p) => p.slug === productSlug)
 
   const priceRef = useRef<HTMLDivElement>(null)
@@ -48,12 +50,12 @@ export default function ProductPage() {
   if (!product) {
     return (
       <main className="mx-auto max-w-5xl px-5 py-24 text-center">
-        <p className="text-ink-muted">Ce produit n'est pas disponible.</p>
+        <p className="text-ink-muted">{t('produitIndisponible')}</p>
         <Link
           to={`/boutique/${shop.slug}`}
           className="mt-4 inline-block text-sm text-ink-faint underline underline-offset-4 hover:text-ink"
         >
-          Voir le catalogue
+          {t('voirCatalogue')}
         </Link>
       </main>
     )
@@ -66,7 +68,7 @@ export default function ProductPage() {
           to={`/boutique/${shop.slug}`}
           className="text-sm text-ink-faint transition hover:text-ink"
         >
-          ← Catalogue
+          {t('retourCatalogue')}
         </Link>
 
         <div className="mt-5 grid gap-8 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:gap-12">
@@ -106,11 +108,13 @@ export default function ProductPage() {
 
 /** Le carré est la règle : l'image du produit est cadrée pareil partout. */
 function Cover({ product }: { product: Product }) {
+  const { t } = useLangue()
+
   if (!product.cover_url) {
     return (
       <div className="grid aspect-square w-full place-items-center rounded-2xl border border-line bg-raise">
         <span className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
-          Sans visuel
+          {t('sansVisuel')}
         </span>
       </div>
     )
@@ -125,6 +129,7 @@ function Cover({ product }: { product: Product }) {
 }
 
 function PriceTag({ product, compact }: { product: Product; compact?: boolean }) {
+  const { langue } = useLangue()
   const discount =
     product.compare_at_price && product.compare_at_price > product.price
       ? Math.round((1 - product.price / product.compare_at_price) * 100)
@@ -141,7 +146,7 @@ function PriceTag({ product, compact }: { product: Product; compact?: boolean })
         className={'font-medium tabular-nums ' + (compact ? 'text-xl' : 'text-3xl sm:text-4xl')}
         style={{ color: buttonColor(product) }}
       >
-        {formatPrice(product.price, product.currency)}
+        {formatPrice(product.price, product.currency, langue)}
       </span>
 
       {product.compare_at_price && (
@@ -150,7 +155,7 @@ function PriceTag({ product, compact }: { product: Product; compact?: boolean })
             'tabular-nums text-ink-faint line-through ' + (compact ? 'text-sm' : 'text-lg')
           }
         >
-          {formatPrice(product.compare_at_price, product.currency)}
+          {formatPrice(product.compare_at_price, product.currency, langue)}
         </span>
       )}
 
@@ -182,6 +187,8 @@ function BuyLink({
   product: Product
   className?: string
 }) {
+  const { t } = useLangue()
+
   return (
     <Link
       to={`/boutique/${shop.slug}/checkout/${product.slug}`}
@@ -192,7 +199,7 @@ function BuyLink({
         className
       }
     >
-      {product.cta_label?.trim() || 'Acheter'}
+      {product.cta_label?.trim() || t('acheter')}
     </Link>
   )
 }
@@ -234,6 +241,7 @@ function StickyBar({
  * la section disparaît entièrement s'il n'y en a aucun.
  */
 function Reviews({ productId }: { productId: string }) {
+  const { t } = useLangue()
   const [reviews, setReviews] = useState<Review[] | null>(null)
 
   useEffect(() => {
@@ -252,9 +260,9 @@ function Reviews({ productId }: { productId: string }) {
   return (
     <section className="mt-16 border-t border-line-soft pt-12 sm:mt-24">
       <header className="mx-auto max-w-2xl text-center">
-        <Eyebrow>Avis clients</Eyebrow>
+        <Eyebrow>{t('avisClients')}</Eyebrow>
         <h2 className="mt-3 text-2xl font-medium leading-tight text-ink sm:text-3xl">
-          Ce qu'en disent celles et ceux qui l'ont acheté
+          {t('avisTitre')}
         </h2>
       </header>
 
@@ -284,11 +292,13 @@ function Reviews({ productId }: { productId: string }) {
 }
 
 function Stars({ rating }: { rating: number }) {
+  const { t } = useLangue()
+
   return (
     <div
       className="flex gap-0.5"
       role="img"
-      aria-label={`${rating} sur 5`}
+      aria-label={t('noteSur5')(rating)}
       style={{ color: 'var(--accent)' }}
     >
       {[1, 2, 3, 4, 5].map((n) => (

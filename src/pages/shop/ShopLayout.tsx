@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useOutletContext, useParams } from 'react-ro
 import { supabase } from '../../lib/supabase'
 import type { Product, Shop } from '../../lib/types'
 import { initPixel, track } from '../../lib/pixel'
+import { useLangue, type Langue } from '../../lib/i18n'
 import { Spinner } from '../../components/ui'
 import ThemeToggle from '../../components/ThemeToggle'
 
@@ -19,6 +20,7 @@ export function useShop() {
  */
 export default function ShopLayout() {
   const { slug } = useParams<{ slug: string }>()
+  const { t } = useLangue()
   const [shop, setShop] = useState<Shop | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,7 +59,7 @@ export default function ShopLayout() {
   if (!shop) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
-        <p className="text-ink-muted">Cette boutique n'existe pas.</p>
+        <p className="text-ink-muted">{t('boutiqueIntrouvable')}</p>
       </div>
     )
   }
@@ -78,16 +80,65 @@ export default function ShopLayout() {
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
             {shop.name}
           </p>
-          {shop.contact_email && (
-            <a
-              href={`mailto:${shop.contact_email}`}
-              className="text-sm text-ink-faint underline-offset-4 hover:text-ink hover:underline"
-            >
-              {shop.contact_email}
-            </a>
-          )}
+          <div className="flex flex-wrap items-center gap-4">
+            {shop.contact_email && (
+              <a
+                href={`mailto:${shop.contact_email}`}
+                className="text-sm text-ink-faint underline-offset-4 hover:text-ink hover:underline"
+              >
+                {shop.contact_email}
+              </a>
+            )}
+            <LanguePicker />
+          </div>
         </div>
       </footer>
+    </div>
+  )
+}
+
+/**
+ * Le choix de langue, en pied de page.
+ *
+ * La langue de l'appareil décide à l'ouverture ; ce sélecteur est là pour
+ * l'acheteur qu'elle dessert — un téléphone en anglais dans un pays
+ * francophone, ou l'inverse. Le choix est gardé d'une visite à l'autre.
+ */
+function LanguePicker() {
+  const { langue, setLangue, t } = useLangue()
+
+  const choix: { code: Langue; nom: string }[] = [
+    { code: 'fr', nom: 'Français' },
+    { code: 'en', nom: 'English' },
+  ]
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="sr-only" id="choix-langue">
+        {t('choixLangue')}
+      </span>
+      <div
+        role="group"
+        aria-labelledby="choix-langue"
+        className="flex overflow-hidden rounded-lg border border-line"
+      >
+        {choix.map((c) => (
+          <button
+            key={c.code}
+            type="button"
+            onClick={() => setLangue(c.code)}
+            aria-pressed={langue === c.code}
+            className={
+              'px-3 py-1.5 text-xs transition ' +
+              (langue === c.code
+                ? 'bg-raise font-medium text-ink'
+                : 'text-ink-faint hover:text-ink')
+            }
+          >
+            {c.nom}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

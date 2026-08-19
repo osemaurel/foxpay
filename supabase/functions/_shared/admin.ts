@@ -18,6 +18,14 @@ export function requireEnv(name: string): string {
 
 export const SITE_URL = () => requireEnv('SITE_URL').replace(/\/+$/, '')
 
-/** Lien de téléchargement envoyé à l'acheteur : il pointe sur la fonction download. */
-export const downloadUrl = (token: string) =>
-  `${requireEnv('SUPABASE_URL')}/functions/v1/download?token=${token}`
+/**
+ * Lien de téléchargement envoyé à l'acheteur : il pointe sur la fonction
+ * download.
+ *
+ * La langue voyage dans l'adresse plutôt que d'être relue en base : la page ne
+ * s'affiche qu'en cas de refus — lien expiré, quota atteint — et aller chercher
+ * une commande pour choisir la langue d'un message d'erreur serait un aller-
+ * retour pour rien. Un paramètre trafiqué ne change que la langue du message.
+ */
+export const downloadUrl = (token: string, langue: 'fr' | 'en' = 'fr') =>
+  `${requireEnv('SUPABASE_URL')}/functions/v1/download?token=${token}&lang=${langue}`

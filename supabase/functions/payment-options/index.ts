@@ -1,7 +1,13 @@
 import { admin } from '../_shared/admin.ts'
-import { catalogueUnifie, resolveurDeMethodes, type Methode } from '../_shared/catalogue.ts'
+import {
+  catalogueUnifie,
+  nomPays,
+  resolveurDeMethodes,
+  type Methode,
+} from '../_shared/catalogue.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { detectCountry } from '../_shared/geo.ts'
+import { lireLangue } from '../_shared/langue.ts'
 import { formatAmount, priceForCountry, type ShopCurrency, withFee } from '../_shared/pawapay.ts'
 
 /**
@@ -21,13 +27,16 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return fail('Méthode non autorisée', 405)
 
-  let body: { slug?: string; product_slug?: string }
+  let body: { slug?: string; product_slug?: string; locale?: string }
   try {
     body = await req.json()
   } catch {
     return fail('Corps JSON invalide')
   }
 
+  // Les noms de pays partent dans la langue de l'acheteur : il les lit dans une
+  // liste déroulante, c'est le premier choix qu'on lui demande.
+  const langue = lireLangue(body.locale)
   const slug = body.slug?.trim()
   if (!slug) return fail('Boutique manquante')
 
@@ -125,7 +134,7 @@ Deno.serve(async (req) => {
     const premier = methodes[0]
     countries.push({
       country: code,
-      name: premier.countryName,
+      name: nomPays(code, langue, premier.countryName),
       prefix: premier.prefix,
       flag: methodes.find((m) => m.flag)?.flag ?? null,
       currency: priced.currency,
@@ -136,7 +145,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  countries.sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+  countries.sort((a, b) => a.name.localeCompare(b.name, langue))
 
   // On ne renvoie le pays deviné que si la boutique y vend vraiment : ailleurs,
   // mieux vaut ne rien présélectionner que de présélectionner un pays inutile.
@@ -167,17 +176,26 @@ function detailsAuthentification(m: Methode, processeur: 'pawapay' | 'sebpay') {
     auth_type: seb.otpRequired ? 'PREAUTH' : 'PROVIDER_AUTH',
     pin_prompt: seb.otpRequired ? null : 'AUTOMATIC',
     pin_prompt_revivable: false,
+    // Les étapes reprennent la forme de celles de pawaPay, dans les deux
+    // langues : la page de paiement les affiche sans savoir d'où elles viennent.
     instructions: seb.ussdCode
       ? {
           channels: [
             {
               type: 'USSD',
-              displayName: { fr: 'Pour obtenir ton code de validation' },
+              displayName: {
+                fr: 'Pour obtenir ton code de validation',
+                en: 'To get your confirmation code',
+              },
               quickLink: seb.ussdCode,
               instructions: {
                 fr: [
                   { text: `Compose ${seb.ussdCode} sur ton téléphone` },
                   { text: 'Note le code reçu par SMS' },
+                ],
+                en: [
+                  { text: `Dial ${seb.ussdCode} on your phone` },
+                  { text: 'Note down the code you receive by SMS' },
                 ],
               },
             },

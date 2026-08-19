@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom'
 import type { Product, Shop } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
+import { useLangue } from '../../lib/i18n'
 import { Eyebrow } from '../../components/ui'
 import { useShop } from './ShopLayout'
 
 export default function ShopHome() {
   const { shop, products } = useShop()
+  const { t } = useLangue()
 
   return (
     <>
@@ -14,14 +16,14 @@ export default function ShopHome() {
       <main className="mx-auto max-w-5xl px-5 pb-24">
         {products.length === 0 ? (
           <div className="rounded-2xl border border-line bg-card p-12 text-center">
-            <p className="text-ink-muted">Aucun produit en vente pour le moment.</p>
+            <p className="text-ink-muted">{t('aucunProduit')}</p>
           </div>
         ) : (
           <>
             <div className="mb-6 flex items-baseline justify-between gap-4">
-              <Eyebrow>Le catalogue</Eyebrow>
+              <Eyebrow>{t('catalogue')}</Eyebrow>
               <span className="font-mono text-xs text-ink-faint">
-                {products.length} produit{products.length > 1 ? 's' : ''}
+                {t('nombreProduits')(products.length)}
               </span>
             </div>
 
@@ -72,6 +74,8 @@ function Hero({ shop }: { shop: Shop }) {
  * grille régulière quelles que soient les images envoyées par le vendeur.
  */
 function ProductCard({ shop, product }: { shop: Shop; product: Product }) {
+  const { langue, t } = useLangue()
+
   return (
     <Link
       to={`/boutique/${shop.slug}/p/${product.slug}`}
@@ -86,7 +90,7 @@ function ProductCard({ shop, product }: { shop: Shop; product: Product }) {
       ) : (
         <div className="grid aspect-square w-full place-items-center border-b border-line-soft bg-raise">
           <span className="font-mono text-xs uppercase tracking-[0.18em] text-ink-faint">
-            Sans visuel
+            {t('sansVisuel')}
           </span>
         </div>
       )}
@@ -98,11 +102,11 @@ function ProductCard({ shop, product }: { shop: Shop; product: Product }) {
             className="text-xl font-medium tabular-nums"
             style={{ color: product.cta_color ?? 'var(--accent)' }}
           >
-            {formatPrice(product.price, product.currency)}
+            {formatPrice(product.price, product.currency, langue)}
           </span>
           {product.compare_at_price && (
             <span className="text-sm tabular-nums text-ink-faint line-through">
-              {formatPrice(product.compare_at_price, product.currency)}
+              {formatPrice(product.compare_at_price, product.currency, langue)}
             </span>
           )}
         </div>

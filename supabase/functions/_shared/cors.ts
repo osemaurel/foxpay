@@ -16,9 +16,14 @@ export function fail(message: string, status = 400): Response {
 }
 
 /** Page HTML minimale pour les erreurs vues directement par l'acheteur. */
-export function htmlMessage(title: string, body: string, status = 200): Response {
+export function htmlMessage(
+  title: string,
+  body: string,
+  status = 200,
+  langue: 'fr' | 'en' = 'fr',
+): Response {
   return new Response(
-    `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+    `<!doctype html><html lang="${langue}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
 <style>body{font-family:system-ui,sans-serif;background:#f8fafc;color:#0f172a;

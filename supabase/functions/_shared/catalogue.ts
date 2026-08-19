@@ -1,4 +1,5 @@
 import { admin } from './admin.ts'
+import type { Langue } from './langue.ts'
 import { getActiveConf, type CountryConf } from './pawapay.ts'
 import { listCountries, listOperators, type SebPayCountry, type SebPayOperator } from './sebpay.ts'
 
@@ -31,6 +32,25 @@ export const NOMS_PAYS: Record<string, string> = {
   GHA: 'Ghana', GIN: 'Guinée', GMB: 'Gambie', GNB: 'Guinée-Bissau',
   KEN: 'Kenya', MLI: 'Mali', NER: 'Niger', NGA: 'Nigéria', SEN: 'Sénégal',
   TGO: 'Togo', TZA: 'Tanzanie', UGA: 'Ouganda',
+}
+
+/**
+ * Les mêmes en anglais. Un acheteur nigérian choisit son pays dans une liste :
+ * la lui présenter en français serait le premier accroc d'un tunnel qu'on a
+ * traduit partout ailleurs.
+ */
+const NOMS_PAYS_EN: Record<string, string> = {
+  BEN: 'Benin', BFA: 'Burkina Faso', CIV: 'Ivory Coast', CMR: 'Cameroon',
+  COD: 'Democratic Republic of the Congo', COG: 'Congo', GAB: 'Gabon',
+  GHA: 'Ghana', GIN: 'Guinea', GMB: 'Gambia', GNB: 'Guinea-Bissau',
+  KEN: 'Kenya', MLI: 'Mali', NER: 'Niger', NGA: 'Nigeria', SEN: 'Senegal',
+  TGO: 'Togo', TZA: 'Tanzania', UGA: 'Uganda',
+}
+
+/** Le nom d'un pays dans la langue de l'acheteur, à défaut celui du processeur. */
+export function nomPays(code: string, langue: Langue, defaut: string): string {
+  const table = langue === 'en' ? NOMS_PAYS_EN : NOMS_PAYS
+  return table[code] ?? NOMS_PAYS[code] ?? defaut
 }
 
 /**

@@ -1,6 +1,7 @@
 import { admin, downloadUrl } from './admin.ts'
 import { NOMS_PAYS } from './catalogue.ts'
 import { sendDownloadEmail, sendSaleEmail } from './email.ts'
+import { lireLangue } from './langue.ts'
 import { getDeposit } from './pawapay.ts'
 import { getCollection, readStatus, SebPayError } from './sebpay.ts'
 
@@ -42,7 +43,7 @@ export type SettleOutcome = {
 
 const CHAMPS =
   'id, status, provider, deposit_id, delivered_at, download_token, buyer_email, created_at, ' +
-  'failure_code, authorization_url, provider_checked_at, ' +
+  'failure_code, authorization_url, provider_checked_at, locale, ' +
   'buyer_name, buyer_phone, charged_amount, charged_currency, country, mmo_provider, ' +
   'shops(name, contact_email, owner_id), products(title)'
 
@@ -57,6 +58,8 @@ type Commande = {
   provider_checked_at: string | null
   delivered_at: string | null
   download_token: string
+  /** La langue lue par l'acheteur, notée au moment du paiement. */
+  locale: string
   buyer_email: string
   buyer_name: string | null
   buyer_phone: string | null
@@ -288,13 +291,15 @@ async function deliver(order: Commande): Promise<void> {
 
   const shop = order.shops as Boutique
   const product = order.products as { title: string }
+  const langue = lireLangue(order.locale)
 
   await sendDownloadEmail({
     to: order.buyer_email,
     shopName: shop.name,
     productTitle: product.title,
-    downloadUrl: downloadUrl(order.download_token),
+    downloadUrl: downloadUrl(order.download_token, langue),
     contactEmail: shop.contact_email,
+    langue,
   })
 
   await admin

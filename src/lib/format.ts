@@ -9,9 +9,16 @@ const SIGLES: Record<string, string> = {
   CDF: 'CDF',
 }
 
+/**
+ * Les séparateurs de milliers suivent la langue de l'acheteur : « 15 000 FCFA »
+ * pour qui lit le français, « 15,000 FCFA » pour qui lit l'anglais. Le français
+ * reste le défaut — c'est la langue de l'administration, qui n'est pas traduite.
+ */
+import { INTL, type Langue } from './i18n'
+
 /** Espace insécable : le montant et son sigle ne doivent pas se séparer. */
-function avecSigle(value: number, sigle: string, decimals: number): string {
-  const nombre = new Intl.NumberFormat('fr-FR', {
+function avecSigle(value: number, sigle: string, decimals: number, langue: Langue): string {
+  const nombre = new Intl.NumberFormat(INTL[langue], {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value)
@@ -19,11 +26,11 @@ function avecSigle(value: number, sigle: string, decimals: number): string {
 }
 
 /** Le franc CFA n'a pas de décimales : on formate des entiers. */
-export function formatPrice(amount: number, currency = 'XOF'): string {
+export function formatPrice(amount: number, currency = 'XOF', langue: Langue = 'fr'): string {
   const sigle = SIGLES[currency]
-  if (sigle) return avecSigle(amount, sigle, 0)
+  if (sigle) return avecSigle(amount, sigle, 0, langue)
 
-  return new Intl.NumberFormat('fr-FR', {
+  return new Intl.NumberFormat(INTL[langue], {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
@@ -35,12 +42,12 @@ export function formatPrice(amount: number, currency = 'XOF'): string {
  * nombre de décimales tel qu'il a été calculé : 15 000 FCFA ne doit pas gagner
  * de décimales au passage, et une devise qui en a garde les siennes.
  */
-export function formatCharged(amount: string, currency: string): string {
+export function formatCharged(amount: string, currency: string, langue: Langue = 'fr'): string {
   const decimals = amount.includes('.') ? Math.max(2, amount.split('.')[1].length) : 0
   const sigle = SIGLES[currency]
-  if (sigle) return avecSigle(Number(amount), sigle, decimals)
+  if (sigle) return avecSigle(Number(amount), sigle, decimals, langue)
 
-  return new Intl.NumberFormat('fr-FR', {
+  return new Intl.NumberFormat(INTL[langue], {
     style: 'currency',
     currency,
     minimumFractionDigits: decimals,

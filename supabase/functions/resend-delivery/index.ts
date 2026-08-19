@@ -2,6 +2,7 @@ import { admin, SITE_URL } from '../_shared/admin.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { describeFailure } from '../_shared/failures.ts'
 import { sendRetryEmail } from '../_shared/email.ts'
+import { lireLangue } from '../_shared/langue.ts'
 import { settleOrder } from '../_shared/settle.ts'
 
 /**
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
   const { data: order } = await admin
     .from('orders')
     .select(
-      'id, status, delivered_at, buyer_email, failure_code, ' +
+      'id, status, delivered_at, buyer_email, failure_code, locale, ' +
         'shops!inner(name, slug, owner_id, contact_email), products(title, slug)',
     )
     .eq('id', orderId)
@@ -105,6 +106,7 @@ async function relancer(
     status: string
     buyer_email: string
     failure_code: string | null
+    locale: string
     products: unknown
   },
   shop: { name: string; slug: string; contact_email: string | null },
@@ -116,14 +118,18 @@ async function relancer(
   const product = order.products as { title: string; slug: string } | null
   if (!product) return fail("Ce produit n'existe plus", 409)
 
+  // La relance repart dans la langue où l'acheteur avait fait sa tentative.
+  const langue = lireLangue(order.locale)
+
   try {
     await sendRetryEmail({
       to: order.buyer_email,
       shopName: shop.name,
       productTitle: product.title,
       retryUrl: `${SITE_URL()}/boutique/${shop.slug}/checkout/${product.slug}`,
-      raison: describeFailure(order.failure_code),
+      raison: describeFailure(order.failure_code, langue),
       contactEmail: shop.contact_email,
+      langue,
     })
   } catch (e) {
     console.error('relance', e)

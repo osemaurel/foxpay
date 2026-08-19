@@ -1,12 +1,15 @@
 import { requireEnv } from './admin.ts'
+import type { Langue } from './langue.ts'
 
 /**
- * Les deux emails d'une vente : le fichier pour l'acheteur, l'avis pour le
- * vendeur.
+ * Les emails d'une vente : le fichier pour l'acheteur, l'avis pour le vendeur.
  *
  * Celui de l'acheteur est la livraison elle-même — sans lui, quelqu'un qui a
  * payé puis fermé sa page n'a plus rien. Celui du vendeur n'est qu'une
  * nouvelle : il ne doit jamais faire échouer le premier.
+ *
+ * Les deux courriers destinés à l'acheteur suivent la langue notée sur sa
+ * commande. L'avis de vente reste en français : il s'adresse au vendeur.
  */
 
 const RESEND = 'https://api.resend.com/emails'
@@ -41,17 +44,43 @@ async function envoyer({ to, subject, html, replyTo }: Envoi): Promise<void> {
 // L'acheteur : son fichier
 // ============================================================
 
+const LIVRAISON = {
+  sujet: {
+    fr: (titre: string) => `Ton téléchargement : ${titre}`,
+    en: (titre: string) => `Your download: ${titre}`,
+  },
+  titre: { fr: 'Merci pour ton achat !', en: 'Thank you for your purchase!' },
+  intro: {
+    fr: (titre: string) =>
+      `Ton paiement pour <strong>${titre}</strong> est confirmé. Voici ton lien de téléchargement :`,
+    en: (titre: string) =>
+      `Your payment for <strong>${titre}</strong> is confirmed. Here is your download link:`,
+  },
+  bouton: { fr: 'Télécharger', en: 'Download' },
+  validite: {
+    fr: 'Ce lien est valable <strong>7 jours</strong> et utilisable <strong>3 fois</strong>. Pense à enregistrer le fichier sur ton appareil.',
+    en: 'This link is good for <strong>7 days</strong> and can be used <strong>3 times</strong>. Remember to save the file to your device.',
+  },
+  souci: {
+    fr: (email: string) =>
+      `Un souci ? Réponds à cet email ou écris à <a href="mailto:${email}">${email}</a>.`,
+    en: (email: string) =>
+      `Something wrong? Reply to this email or write to <a href="mailto:${email}">${email}</a>.`,
+  },
+} as const
+
 export function sendDownloadEmail(params: {
   to: string
   shopName: string
   productTitle: string
   downloadUrl: string
   contactEmail: string | null
+  langue: Langue
 }): Promise<void> {
   return envoyer({
     to: params.to,
     replyTo: params.contactEmail,
-    subject: `Ton téléchargement : ${params.productTitle}`,
+    subject: LIVRAISON.sujet[params.langue](params.productTitle),
     html: buildDownloadHtml(params),
   })
 }
@@ -61,29 +90,30 @@ function buildDownloadHtml({
   productTitle,
   downloadUrl,
   contactEmail,
+  langue,
 }: {
   shopName: string
   productTitle: string
   downloadUrl: string
   contactEmail: string | null
+  langue: Langue
 }): string {
   return page(`
-<h1 style="margin:0 0 16px;font-size:20px">Merci pour ton achat !</h1>
+<h1 style="margin:0 0 16px;font-size:20px">${LIVRAISON.titre[langue]}</h1>
 <p style="color:#475569;line-height:1.6;margin:0 0 24px">
-Ton paiement pour <strong>${escapeHtml(productTitle)}</strong> est confirmé.
-Voici ton lien de téléchargement :</p>
+${LIVRAISON.intro[langue](escapeHtml(productTitle))}</p>
 <a href="${downloadUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
-padding:14px;border-radius:8px;text-decoration:none;font-weight:600">Télécharger</a>
+padding:14px;border-radius:8px;text-decoration:none;font-weight:600">${LIVRAISON.bouton[langue]}</a>
 <p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">
-Ce lien est valable <strong>7 jours</strong> et utilisable <strong>3 fois</strong>.
-Pense à enregistrer le fichier sur ton appareil.</p>
+${LIVRAISON.validite[langue]}</p>
 ${
   contactEmail
-    ? `<p style="color:#64748b;font-size:14px;margin:16px 0 0">Un souci ? Réponds à cet email
-ou écris à <a href="mailto:${escapeHtml(contactEmail)}">${escapeHtml(contactEmail)}</a>.</p>`
+    ? `<p style="color:#64748b;font-size:14px;margin:16px 0 0">${LIVRAISON.souci[langue](
+        escapeHtml(contactEmail),
+      )}</p>`
     : ''
 }
-<p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(shopName)}</p>`)
+<p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(shopName)}</p>`, langue)
 }
 
 // ============================================================
@@ -150,6 +180,31 @@ Réponds à cet email pour écrire directement à l'acheteur.</p>
 // L'acheteur qui n'a pas abouti : la relance
 // ============================================================
 
+const RELANCE = {
+  sujet: {
+    fr: (titre: string) => `Ton paiement n'a pas abouti : ${titre}`,
+    en: (titre: string) => `Your payment didn't go through: ${titre}`,
+  },
+  titre: { fr: "Ton paiement n'est pas passé", en: "Your payment didn't go through" },
+  intro: {
+    fr: (titre: string) =>
+      `Tu as essayé d'acheter <strong>${titre}</strong>, mais le paiement n'a pas abouti. <strong>Rien ne t'a été débité.</strong>`,
+    en: (titre: string) =>
+      `You tried to buy <strong>${titre}</strong>, but the payment didn't go through. <strong>Nothing was charged to you.</strong>`,
+  },
+  bouton: { fr: 'Reprendre mon achat', en: 'Pick up where I left off' },
+  souci: {
+    fr: (email: string) =>
+      `Un souci ? Réponds à cet email ou écris à <a href="mailto:${email}">${email}</a>.`,
+    en: (email: string) =>
+      `Something wrong? Reply to this email or write to <a href="mailto:${email}">${email}</a>.`,
+  },
+  souciSansContact: {
+    fr: 'Un souci ? Réponds simplement à cet email.',
+    en: 'Something wrong? Just reply to this email.',
+  },
+} as const
+
 export type Relance = {
   to: string
   shopName: string
@@ -159,6 +214,7 @@ export type Relance = {
   /** Ce qui a bloqué, dit à l'acheteur — pas le message technique. */
   raison: string
   contactEmail: string | null
+  langue: Langue
 }
 
 /**
@@ -172,37 +228,33 @@ export function sendRetryEmail(r: Relance): Promise<void> {
   return envoyer({
     to: r.to,
     replyTo: r.contactEmail,
-    subject: `Ton paiement n'a pas abouti : ${r.productTitle}`,
+    subject: RELANCE.sujet[r.langue](r.productTitle),
     html: buildRetryHtml(r),
   })
 }
 
 function buildRetryHtml(r: Relance): string {
   return page(`
-<h1 style="margin:0 0 16px;font-size:20px">Ton paiement n'est pas passé</h1>
+<h1 style="margin:0 0 16px;font-size:20px">${RELANCE.titre[r.langue]}</h1>
 <p style="color:#475569;line-height:1.6;margin:0 0 16px">
-Tu as essayé d'acheter <strong>${escapeHtml(r.productTitle)}</strong>, mais le paiement
-n'a pas abouti. <strong>Rien ne t'a été débité.</strong></p>
+${RELANCE.intro[r.langue](escapeHtml(r.productTitle))}</p>
 <p style="color:#475569;line-height:1.6;margin:0 0 24px">${escapeHtml(r.raison)}</p>
 <a href="${r.retryUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
-padding:14px;border-radius:8px;text-decoration:none;font-weight:600">Reprendre mon achat</a>
-${
-  r.contactEmail
-    ? `<p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">Un souci ?
-Réponds à cet email ou écris à
-<a href="mailto:${escapeHtml(r.contactEmail)}">${escapeHtml(r.contactEmail)}</a>.</p>`
-    : `<p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">Un souci ?
-Réponds simplement à cet email.</p>`
-}
-<p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(r.shopName)}</p>`)
+padding:14px;border-radius:8px;text-decoration:none;font-weight:600">${RELANCE.bouton[r.langue]}</a>
+<p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">${
+    r.contactEmail
+      ? RELANCE.souci[r.langue](escapeHtml(r.contactEmail))
+      : RELANCE.souciSansContact[r.langue]
+  }</p>
+<p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(r.shopName)}</p>`, r.langue)
 }
 
 // ============================================================
 // Habillage commun
 // ============================================================
 
-function page(contenu: string): string {
-  return `<!doctype html><html lang="fr"><body style="margin:0;padding:24px;background:#f8fafc;
+function page(contenu: string, langue: Langue = 'fr'): string {
+  return `<!doctype html><html lang="${langue}"><body style="margin:0;padding:24px;background:#f8fafc;
 font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#0f172a">
 <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;
 border-radius:12px;padding:32px">${contenu}

@@ -1,6 +1,7 @@
 import { admin, downloadUrl } from '../_shared/admin.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { describeFailure } from '../_shared/failures.ts'
+import { lireLangue } from '../_shared/langue.ts'
 import { settleOrder } from '../_shared/settle.ts'
 
 /**
@@ -25,12 +26,13 @@ Deno.serve(async (req) => {
 
   const { data: order } = await admin
     .from('orders')
-    .select('id, status, download_token, failure_code, authorization_url')
+    .select('id, status, download_token, failure_code, authorization_url, locale')
     .eq('id', body.order_id)
     .maybeSingle()
 
   if (!order) return fail('Commande introuvable', 404)
 
+  const langue = lireLangue(order.locale)
   let status = order.status
   let failureCode: string | null = order.failure_code
   let authorizationUrl: string | null = order.authorization_url
@@ -51,11 +53,11 @@ Deno.serve(async (req) => {
 
   return json({
     status,
-    download_url: status === 'paid' ? downloadUrl(order.download_token) : null,
+    download_url: status === 'paid' ? downloadUrl(order.download_token, langue) : null,
     // Les opérateurs à autorisation par redirection (Wave) fournissent cette
     // URL quelques secondes après l'initiation. C'est le seul cas où l'acheteur
     // doit quitter la page — c'est le fonctionnement imposé par l'opérateur.
     authorization_url: status === 'pending' ? authorizationUrl : null,
-    message: status === 'failed' ? describeFailure(failureCode) : null,
+    message: status === 'failed' ? describeFailure(failureCode, langue) : null,
   })
 })
