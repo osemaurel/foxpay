@@ -48,10 +48,19 @@ export const CFA_CURRENCIES: Record<string, string> = {
   GAB: 'XAF',
 }
 
-/** Pays atteignables avec une devise hors zone CFA, par devise. */
+/**
+ * Pays atteignables avec une devise hors zone CFA, par devise.
+ *
+ * Chacun a besoin d'un taux enregistré par le vendeur (`shop_currencies`) pour
+ * être proposé : sans taux, on ne sait pas quel montant y demander, et le pays
+ * reste invisible. C'est volontaire — mieux vaut ne pas proposer un pays que
+ * d'y afficher un prix faux.
+ */
 export const EXTRA_CURRENCY_COUNTRIES: Record<string, string[]> = {
   CDF: ['COD'],
   USD: ['COD'],
+  NGN: ['NGA'],
+  GHS: ['GHA'],
 }
 
 /**

@@ -5,21 +5,50 @@ import { Alert, Button, Card, Field, Spinner, inputClass } from '../../component
 import { useAdmin } from './AdminLayout'
 
 /**
- * La RDC est le seul pays hors zone franc CFA atteignable par pawaPay, et on y
- * vend en franc congolais. La plateforme y accepterait aussi le dollar, mais
- * c'est une décision commerciale : un seul prix, dans la monnaie du pays.
+ * Les pays hors zone franc CFA, qu'il faut ouvrir un par un.
+ *
+ * Ceux de la zone partagent le prix affiché tel quel — XOF et XAF valent la même
+ * chose. Ailleurs, chaque pays a sa monnaie : sans taux enregistré, on ne sait
+ * pas quel montant demander et le pays reste invisible sur la page de paiement.
+ *
+ * `defaultRate` n'est qu'un point de départ relevé le jour où ce pays a été
+ * ajouté. Le naira surtout bouge vite : c'est au vendeur de vérifier avant
+ * d'ouvrir la vente.
  */
-const OPTIONS = {
-  CDF: {
+const PAYS = [
+  {
+    code: 'CDF',
+    pays: 'République démocratique du Congo',
     label: 'Franc congolais (CDF)',
     decimals: 0,
     roundTo: 100,
     defaultRate: 4.04,
     hint: 'Combien de francs congolais pour 1 FCFA.',
   },
-} as const
+  {
+    code: 'NGN',
+    pays: 'Nigéria',
+    label: 'Naira (NGN)',
+    decimals: 0,
+    roundTo: 100,
+    defaultRate: 2.39,
+    hint: 'Combien de nairas pour 1 FCFA.',
+  },
+  {
+    code: 'GHS',
+    pays: 'Ghana',
+    label: 'Cedi (GHS)',
+    decimals: 0,
+    roundTo: 1,
+    defaultRate: 0.0195,
+    hint: 'Combien de cedis pour 1 FCFA.',
+  },
+] as const
 
-type Code = keyof typeof OPTIONS
+type Code = (typeof PAYS)[number]['code']
+
+/** Ce qu'on garde à l'écran pour chaque pays. */
+type Ligne = { actif: boolean; rate: string; updatedAt: string | null }
 
 /** Reproduit exactement le calcul fait côté serveur au moment du paiement. */
 function convert(price: number, rate: number, decimals: number, roundTo: number): string {
@@ -31,11 +60,13 @@ function convert(price: number, rate: number, decimals: number, roundTo: number)
 
 const JOURS_AVANT_ALERTE = 30
 
+const VIDE: Ligne = { actif: false, rate: '', updatedAt: null }
+
 export default function CurrenciesEditor() {
   const { shop, products } = useAdmin()
-  const [choix, setChoix] = useState<'' | Code>('')
-  const [rate, setRate] = useState('')
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+  const [lignes, setLignes] = useState<Record<Code, Ligne>>(
+    () => Object.fromEntries(PAYS.map((p) => [p.code, VIDE])) as Record<Code, Ligne>,
+  )
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,59 +79,89 @@ export default function CurrenciesEditor() {
       .eq('shop_id', shop.id)
       .eq('is_active', true)
       .then(({ data }) => {
-        const actif = data?.[0]
-        if (actif) {
-          setChoix(actif.currency as Code)
-          setRate(String(actif.rate))
-          setUpdatedAt(actif.updated_at)
-        }
+        setLignes((avant) => {
+          const apres = { ...avant }
+          for (const row of data ?? []) {
+            if (!(row.currency in apres)) continue
+            apres[row.currency as Code] = {
+              actif: true,
+              rate: String(row.rate),
+              updatedAt: row.updated_at,
+            }
+          }
+          return apres
+        })
         setLoading(false)
       })
   }, [shop.id])
+
+  function modifier(code: Code, champs: Partial<Ligne>) {
+    setLignes((avant) => ({ ...avant, [code]: { ...avant[code], ...champs } }))
+    setSaved(false)
+  }
 
   async function save() {
     setBusy(true)
     setError(null)
 
-    // Une seule devise active à la fois : deux montants pour le même pays
-    // laisseraient pawaPay arbitrer, ce que la documentation ne précise pas.
-    const { error: cleanupError } = await supabase
+    const ouverts = PAYS.filter((p) => lignes[p.code].actif)
+
+    for (const p of ouverts) {
+      const valeur = Number(lignes[p.code].rate)
+      if (!Number.isFinite(valeur) || valeur <= 0) {
+        setError(`Le taux pour ${p.pays} doit être un nombre supérieur à zéro.`)
+        setBusy(false)
+        return
+      }
+    }
+
+    // Fermer un pays, c'est retirer sa ligne : la page de paiement se règle sur
+    // ce qui existe en base. On ne touche qu'aux devises de cet écran, pour ne
+    // pas effacer un réglage posé ailleurs.
+    const fermes = PAYS.filter((p) => !lignes[p.code].actif).map((p) => p.code)
+
+    const { error: retraitError } = await supabase
       .from('shop_currencies')
       .delete()
       .eq('shop_id', shop.id)
+      .in('currency', fermes)
 
-    if (cleanupError) {
-      setError(cleanupError.message)
+    if (retraitError) {
+      setError(retraitError.message)
       setBusy(false)
       return
     }
 
-    if (choix) {
-      const config = OPTIONS[choix]
-      const valeur = Number(rate)
-      if (!Number.isFinite(valeur) || valeur <= 0) {
-        setError('Le taux doit être un nombre supérieur à zéro.')
+    if (ouverts.length > 0) {
+      const { error: ecritureError } = await supabase.from('shop_currencies').upsert(
+        ouverts.map((p) => ({
+          shop_id: shop.id,
+          currency: p.code,
+          rate: Number(lignes[p.code].rate),
+          decimals: p.decimals,
+          round_to: p.roundTo,
+          is_active: true,
+        })),
+        { onConflict: 'shop_id,currency' },
+      )
+
+      if (ecritureError) {
+        setError(ecritureError.message)
         setBusy(false)
         return
       }
-
-      const { error } = await supabase.from('shop_currencies').insert({
-        shop_id: shop.id,
-        currency: choix,
-        rate: valeur,
-        decimals: config.decimals,
-        round_to: config.roundTo,
-      })
-
-      if (error) {
-        setError(error.message)
-        setBusy(false)
-        return
-      }
-      setUpdatedAt(new Date().toISOString())
-    } else {
-      setUpdatedAt(null)
     }
+
+    const maintenant = new Date().toISOString()
+    setLignes((avant) => {
+      const apres = { ...avant }
+      for (const p of PAYS) {
+        apres[p.code] = apres[p.code].actif
+          ? { ...apres[p.code], updatedAt: maintenant }
+          : { ...apres[p.code], updatedAt: null }
+      }
+      return apres
+    })
 
     setSaved(true)
     setBusy(false)
@@ -108,100 +169,104 @@ export default function CurrenciesEditor() {
 
   if (loading) {
     return (
-      <Card title="Vendre en RDC">
-        <Spinner label="Chargement du taux de conversion…" />
+      <Card title="Vendre hors zone franc CFA">
+        <Spinner label="Chargement des taux de conversion…" />
       </Card>
     )
   }
 
-  const config = choix ? OPTIONS[choix] : null
   const exemple = products.find((p) => p.price > 0)
-  const taux = Number(rate)
-  const apercu =
-    config && exemple && Number.isFinite(taux) && taux > 0
-      ? convert(exemple.price, taux, config.decimals, config.roundTo)
-      : null
-
-  const ancien =
-    updatedAt &&
-    Date.now() - new Date(updatedAt).getTime() > JOURS_AVANT_ALERTE * 86400000
 
   return (
-    <Card title="Vendre en RDC">
+    <Card title="Vendre hors zone franc CFA">
       <p className="mb-5 text-sm leading-relaxed text-ink-muted">
-        Les pays de la zone franc CFA partagent ton prix tel quel. La République démocratique
-        du Congo a sa propre monnaie : il faut donc un taux de conversion pour y vendre.
+        Les pays de la zone franc CFA partagent ton prix tel quel. Ailleurs, chaque pays a sa
+        monnaie : ouvre-le en donnant son taux de conversion, et il apparaîtra sur ta page de
+        paiement avec les opérateurs qu'on y sait joindre.
       </p>
 
-      <div className="space-y-4">
-        <Field label="Vendre en République démocratique du Congo">
-          <select
-            value={choix}
-            onChange={(e) => {
-              const code = e.target.value as '' | Code
-              setChoix(code)
-              if (code && !rate) setRate(String(OPTIONS[code].defaultRate))
-              setSaved(false)
-            }}
-            className={inputClass}
-          >
-            <option value="">Ne pas vendre en RDC</option>
-            {(Object.keys(OPTIONS) as Code[]).map((code) => (
-              <option key={code} value={code}>
-                {OPTIONS[code].label}
-              </option>
-            ))}
-          </select>
-        </Field>
+      <div className="space-y-5">
+        {PAYS.map((p) => {
+          const ligne = lignes[p.code]
+          const taux = Number(ligne.rate)
+          const apercu =
+            exemple && Number.isFinite(taux) && taux > 0
+              ? convert(exemple.price, taux, p.decimals, p.roundTo)
+              : null
 
-        {config && (
-          <>
-            <Field label="Taux de conversion" hint={config.hint}>
-              <input
-                type="number"
-                step="any"
-                min={0}
-                value={rate}
-                onChange={(e) => {
-                  setRate(e.target.value)
-                  setSaved(false)
-                }}
-                className={inputClass}
-              />
-            </Field>
+          const ancien =
+            ligne.actif &&
+            ligne.updatedAt &&
+            Date.now() - new Date(ligne.updatedAt).getTime() > JOURS_AVANT_ALERTE * 86400000
 
-            {exemple && (
-              <div className="rounded-xl border border-line bg-raise p-4">
-                <p className="text-xs text-ink-faint">Ce que paiera un acheteur en RDC</p>
-                <p className="mt-1 text-ink">
-                  <span className="text-ink-faint">
-                    {formatPrice(exemple.price, exemple.currency)}
-                  </span>{' '}
-                  →{' '}
-                  <span className="font-medium tabular-nums">
-                    {apercu ?? '—'} {choix}
-                  </span>
-                </p>
-                <p className="mt-1 truncate text-xs text-ink-faint">
-                  d'après « {exemple.title} »
-                </p>
-              </div>
-            )}
+          return (
+            <div key={p.code} className="rounded-xl border border-line p-4">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={ligne.actif}
+                  onChange={(e) => {
+                    const actif = e.target.checked
+                    modifier(p.code, {
+                      actif,
+                      rate: actif && !ligne.rate ? String(p.defaultRate) : ligne.rate,
+                    })
+                  }}
+                  className="h-4 w-4 shrink-0 accent-[var(--accent)]"
+                />
+                <span className="text-sm font-medium text-ink">Vendre au {p.pays}</span>
+              </label>
 
-            <p className="text-xs leading-relaxed text-ink-faint">
-              Le taux est enregistré, pas récupéré en direct : une API de change indisponible
-              empêcherait tes clients de payer. En contrepartie, c'est à toi de le remettre à
-              jour quand la monnaie bouge.
-            </p>
+              {ligne.actif && (
+                <div className="mt-4 space-y-3">
+                  <Field label={`Taux — ${p.label}`} hint={p.hint}>
+                    <input
+                      type="number"
+                      step="any"
+                      min={0}
+                      value={ligne.rate}
+                      onChange={(e) => modifier(p.code, { rate: e.target.value })}
+                      className={inputClass}
+                    />
+                  </Field>
 
-            {ancien && (
-              <Alert kind="error">
-                Ce taux n'a pas été mis à jour depuis plus de {JOURS_AVANT_ALERTE} jours.
-                Vérifie qu'il correspond toujours au marché.
-              </Alert>
-            )}
-          </>
-        )}
+                  {exemple && (
+                    <div className="rounded-lg border border-line bg-raise p-3">
+                      <p className="text-xs text-ink-faint">
+                        Ce que paiera un acheteur au {p.pays}
+                      </p>
+                      <p className="mt-1 text-ink">
+                        <span className="text-ink-faint">
+                          {formatPrice(exemple.price, exemple.currency)}
+                        </span>{' '}
+                        →{' '}
+                        <span className="font-medium tabular-nums">
+                          {apercu ?? '—'} {p.code}
+                        </span>
+                      </p>
+                      <p className="mt-1 truncate text-xs text-ink-faint">
+                        d'après « {exemple.title} »
+                      </p>
+                    </div>
+                  )}
+
+                  {ancien && (
+                    <Alert kind="error">
+                      Ce taux n'a pas été mis à jour depuis plus de {JOURS_AVANT_ALERTE} jours.
+                      Vérifie qu'il correspond toujours au marché.
+                    </Alert>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        <p className="text-xs leading-relaxed text-ink-faint">
+          Les taux sont enregistrés, pas récupérés en direct : une API de change indisponible
+          empêcherait tes clients de payer. En contrepartie, c'est à toi de les remettre à jour
+          quand une monnaie bouge — le naira en particulier.
+        </p>
 
         {error && <Alert kind="error">{error}</Alert>}
         {saved && <Alert kind="ok">Enregistré.</Alert>}
