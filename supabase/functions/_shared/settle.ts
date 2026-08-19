@@ -4,7 +4,15 @@ import { sendDownloadEmail, sendSaleEmail } from './email.ts'
 import { getDeposit } from './pawapay.ts'
 import { getCollection, readStatus, SebPayError } from './sebpay.ts'
 
-const DOWNLOAD_WINDOW_HOURS = 24
+/**
+ * Combien de temps le lien de téléchargement reste ouvert après le paiement.
+ *
+ * Une semaine : assez pour qu'un acheteur qui ouvre ses mails le week-end, ou
+ * qui change de téléphone, retrouve son fichier sans écrire au vendeur. La
+ * limite de téléchargements (`orders.max_downloads`) reste le vrai garde-fou
+ * contre le partage — pas la durée.
+ */
+const DOWNLOAD_WINDOW_DAYS = 7
 
 /**
  * Délai avant de conclure qu'une initiation n'a jamais abouti. Juste après
@@ -249,7 +257,7 @@ async function payer(
       status: 'paid',
       paid_at: new Date().toISOString(),
       download_expires_at: new Date(
-        Date.now() + DOWNLOAD_WINDOW_HOURS * 3600 * 1000,
+        Date.now() + DOWNLOAD_WINDOW_DAYS * 24 * 3600 * 1000,
       ).toISOString(),
       provider_transaction_id: transactionId,
       country: country ?? undefined,

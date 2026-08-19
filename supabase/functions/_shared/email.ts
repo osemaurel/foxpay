@@ -75,7 +75,7 @@ Voici ton lien de téléchargement :</p>
 <a href="${downloadUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
 padding:14px;border-radius:8px;text-decoration:none;font-weight:600">Télécharger</a>
 <p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">
-Ce lien est valable <strong>24 heures</strong> et utilisable <strong>3 fois</strong>.
+Ce lien est valable <strong>7 jours</strong> et utilisable <strong>3 fois</strong>.
 Pense à enregistrer le fichier sur ton appareil.</p>
 ${
   contactEmail

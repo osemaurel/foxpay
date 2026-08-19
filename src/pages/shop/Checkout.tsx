@@ -700,7 +700,7 @@ function Paid({
       <Eyebrow>C'est réglé</Eyebrow>
       <p className="text-sm leading-relaxed text-ink-muted">
         Merci&nbsp;! Ton paiement est confirmé et « {product.title} » t'attend. Le lien a aussi
-        été envoyé{email ? ` à ${email}` : ' par email'}, tu peux y revenir pendant 24&nbsp;h.
+        été envoyé{email ? ` à ${email}` : ' par email'}, tu peux y revenir pendant 7&nbsp;jours.
       </p>
       {downloadUrl && (
         <a

@@ -20,7 +20,7 @@ const REFUSALS: Record<string, { title: string; body: string }> = {
   },
   expired: {
     title: 'Lien expiré',
-    body: 'Ce lien était valable 24 heures. Contacte le vendeur pour en obtenir un nouveau.',
+    body: 'Ce lien était valable 7 jours. Contacte le vendeur pour en obtenir un nouveau.',
   },
   exhausted: {
     title: 'Nombre de téléchargements atteint',
