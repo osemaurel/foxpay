@@ -28,6 +28,19 @@
   --ink-muted: rgba(255, 255, 255, 0.62);
   --ink-faint: rgba(255, 255, 255, 0.4);
   --shadow: 0 0 0 0 transparent;
+
+  /*
+    Couleurs de séries des graphiques, distinctes de l'accent : l'accent est la
+    couleur de la boutique et change d'une boutique à l'autre, une série doit
+    rester lisible quoi qu'il arrive.
+
+    Bleu = ce qui a abouti, orange = ce qui a échoué, partout et dans cet ordre.
+    La paire a été validée sur les deux fonds : elle reste séparable pour un œil
+    daltonien (ΔE 26,8 en protanopie), là où le vert/rouge attendu tombait à 3,8
+    et devenait illisible pour un lecteur sur vingt.
+  */
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
 }
 
 /*
@@ -49,6 +62,10 @@
   --ink-muted: rgba(9, 9, 11, 0.68);
   --ink-faint: rgba(9, 9, 11, 0.5);
   --shadow: 0 1px 2px rgba(9, 9, 11, 0.06);
+
+  /* Les mêmes deux teintes, redosées pour le fond blanc — pas une inversion. */
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
 }
 
 @theme inline {

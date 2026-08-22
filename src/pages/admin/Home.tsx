@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { Order } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
 import { Card } from '../../components/ui'
+import Analytique from './Analytique'
 import { useAdmin } from './AdminLayout'
 
 export default function Home() {
@@ -90,6 +91,8 @@ export default function Home() {
           Voir le détail des ventes
         </Link>
       </Card>
+
+      {orders && <Analytique orders={orders} />}
     </>
   )
 }
