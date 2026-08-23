@@ -188,7 +188,7 @@ const orders: Order[] = COMMANDES.map(
       download_token: `token-${i}`,
       download_expires_at: status === 'paid' ? daysAgo(days - 1) : null,
       download_count: status === 'paid' ? [1, 2, 0, 1, 0, 3, 1][i] : 0,
-      max_downloads: 3,
+      max_downloads: 10,
       delivered_at: status === 'paid' ? daysAgo(days) : null,
       created_at: daysAgo(days),
       updated_at: daysAgo(days),

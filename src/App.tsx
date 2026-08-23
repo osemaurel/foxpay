@@ -6,6 +6,7 @@ import { Spinner } from './components/ui'
 import ScrollToTop from './components/ScrollToTop'
 import ConfigError from './pages/ConfigError'
 import Login from './pages/Login'
+import Telechargement from './pages/Telechargement'
 import ShopLayout from './pages/shop/ShopLayout'
 import ShopHome from './pages/shop/ShopHome'
 import ProductPage from './pages/shop/ProductPage'
@@ -43,6 +44,9 @@ export default function App() {
           <Route path="p/:productSlug" element={<ProductPage />} />
           <Route path="checkout/:productSlug" element={<Checkout />} />
         </Route>
+
+        {/* Où atterrit un lien de téléchargement refusé. */}
+        <Route path="/telechargement" element={<Telechargement />} />
 
         <Route path="/login" element={session ? <Navigate to="/admin" replace /> : <Login />} />
 

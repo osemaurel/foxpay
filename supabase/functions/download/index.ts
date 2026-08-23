@@ -1,5 +1,4 @@
-import { admin } from '../_shared/admin.ts'
-import { htmlMessage } from '../_shared/cors.ts'
+import { admin, SITE_URL } from '../_shared/admin.ts'
 import { lireLangue, type Langue } from '../_shared/langue.ts'
 
 /**
@@ -10,113 +9,47 @@ import { lireLangue, type Langue } from '../_shared/langue.ts'
  * dans consume_download(), sous verrou, pour qu'un double-clic ne compte pas
  * deux fois — ou pire, ne dépasse pas le quota.
  *
- * La langue vient du paramètre `lang` posé dans le lien au moment de l'envoi :
- * ces pages ne s'affichent qu'en cas de refus, et charger une commande pour
- * choisir la langue d'un message d'erreur serait un aller-retour pour rien.
+ * Quand ça se passe bien, la réponse est une redirection vers une URL signée.
+ * Quand ça se passe mal, c'est une redirection vers /telechargement sur le
+ * site : la passerelle des Edge Functions renvoie désormais tout HTML en
+ * `text/plain`, une page servie d'ici s'afficherait donc en code source sur le
+ * téléphone de l'acheteur. Le site, lui, est un vrai site.
+ *
+ * La langue voyage dans le lien (`lang`) posé au moment de l'envoi et suit
+ * jusqu'à la page de refus.
  */
-const REFUSALS: Record<string, Record<Langue, { title: string; body: string }>> = {
-  not_found: {
-    fr: {
-      title: 'Lien inconnu',
-      body: "Ce lien de téléchargement n'existe pas. Vérifie que tu as copié l'adresse complète depuis l'email.",
-    },
-    en: {
-      title: 'Unknown link',
-      body: "This download link doesn't exist. Check that you copied the full address from the email.",
-    },
-  },
-  not_paid: {
-    fr: {
-      title: 'Paiement non confirmé',
-      body: "Nous n'avons pas encore reçu la confirmation de ton paiement. Le lien s'activera dès que l'opérateur nous la transmet.",
-    },
-    en: {
-      title: 'Payment not confirmed',
-      body: "We haven't received confirmation of your payment yet. The link will work as soon as your provider sends it.",
-    },
-  },
-  expired: {
-    fr: {
-      title: 'Lien expiré',
-      body: 'Ce lien était valable 7 jours. Contacte le vendeur pour en obtenir un nouveau.',
-    },
-    en: {
-      title: 'Link expired',
-      body: 'This link was good for 7 days. Contact the seller to get a new one.',
-    },
-  },
-  exhausted: {
-    fr: {
-      title: 'Nombre de téléchargements atteint',
-      body: 'Ce lien a déjà servi le nombre de fois prévu. Contacte le vendeur si tu as perdu le fichier.',
-    },
-    en: {
-      title: 'Download limit reached',
-      body: 'This link has already been used the number of times allowed. Contact the seller if you lost the file.',
-    },
-  },
-}
-
-const ERREURS = {
-  incomplet: {
-    fr: { title: 'Lien invalide', body: 'Ce lien est incomplet.' },
-    en: { title: 'Invalid link', body: 'This link is incomplete.' },
-  },
-  panne: {
-    fr: { title: 'Erreur', body: 'Réessaie dans un instant.' },
-    en: { title: 'Something went wrong', body: 'Please try again in a moment.' },
-  },
-  retire: {
-    fr: {
-      title: 'Fichier indisponible',
-      body: 'Le fichier a été retiré par le vendeur. Contacte-le pour être livré.',
-    },
-    en: {
-      title: 'File unavailable',
-      body: 'The seller removed this file. Get in touch with them to receive it.',
-    },
-  },
-  inaccessible: {
-    fr: { title: 'Erreur', body: 'Le fichier est momentanément inaccessible.' },
-    en: { title: 'Something went wrong', body: 'The file is temporarily unreachable.' },
-  },
-} as const
+const pageDeRefus = (raison: string, langue: Langue) =>
+  `${SITE_URL()}/telechargement?raison=${raison}&lang=${langue}`
 
 Deno.serve(async (req) => {
   const url = new URL(req.url)
   const token = url.searchParams.get('token')
   const langue = lireLangue(url.searchParams.get('lang'))
 
-  if (!token) {
-    const { title, body } = ERREURS.incomplet[langue]
-    return htmlMessage(title, body, 400, langue)
-  }
+  if (!token) return Response.redirect(pageDeRefus('incomplet', langue), 302)
+
+  // Les aperçus de lien — messageries, antivirus de boîte mail — demandent
+  // souvent la page en HEAD. Répondre sans passer par consume_download évite
+  // qu'un aperçu brûle un téléchargement que l'acheteur n'a pas fait.
+  if (req.method === 'HEAD') return new Response(null, { status: 200 })
 
   const { data, error } = await admin.rpc('consume_download', { p_token: token })
   if (error) {
     console.error('consume_download', error)
-    const { title, body } = ERREURS.panne[langue]
-    return htmlMessage(title, body, 500, langue)
+    return Response.redirect(pageDeRefus('panne', langue), 302)
   }
 
   const row = (data as { file_path: string | null; file_name: string | null; refusal: string | null }[])[0]
 
   if (!row || row.refusal) {
-    const refusal = (REFUSALS[row?.refusal ?? 'not_found'] ?? REFUSALS.not_found)[langue]
-    return htmlMessage(
-      refusal.title,
-      refusal.body,
-      row?.refusal === 'not_found' ? 404 : 410,
-      langue,
-    )
+    return Response.redirect(pageDeRefus(row?.refusal ?? 'not_found', langue), 302)
   }
 
   if (!row.file_path) {
     // Le vendeur a retiré le fichier après la vente : ce n'est pas la faute de
     // l'acheteur, et le compteur a déjà été décrémenté. À traiter à la main.
     console.error('commande payée sans fichier', token)
-    const { title, body } = ERREURS.retire[langue]
-    return htmlMessage(title, body, 404, langue)
+    return Response.redirect(pageDeRefus('retire', langue), 302)
   }
 
   // URL signée de courte durée : le temps de la redirection, pas plus.
@@ -126,8 +59,7 @@ Deno.serve(async (req) => {
 
   if (signError || !signed) {
     console.error('createSignedUrl', signError)
-    const { title, body } = ERREURS.inaccessible[langue]
-    return htmlMessage(title, body, 500, langue)
+    return Response.redirect(pageDeRefus('inaccessible', langue), 302)
   }
 
   return Response.redirect(signed.signedUrl, 302)
