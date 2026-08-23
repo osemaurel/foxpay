@@ -17,6 +17,7 @@ import ProductsList from './pages/admin/ProductsList'
 import ProductEdit from './pages/admin/ProductEdit'
 import SalesPage from './pages/admin/SalesPage'
 import SettingsPage from './pages/admin/SettingsPage'
+import Retraits from './pages/admin/Retraits'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="produits/nouveau" element={<ProductEdit />} />
           <Route path="produits/:productId" element={<ProductEdit />} />
           <Route path="ventes" element={<SalesPage />} />
+          <Route path="retraits" element={<Retraits />} />
           <Route path="parametres" element={<SettingsPage />} />
         </Route>
 

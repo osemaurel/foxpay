@@ -89,3 +89,24 @@ export type Order = {
   created_at: string
   updated_at: string
 }
+
+/** Un retrait : de l'argent qui sort du portefeuille vers un numéro. */
+export type Payout = {
+  id: string
+  shop_id: string
+  provider: 'pawapay' | 'sebpay'
+  /** ISO alpha-3 du portefeuille débité. */
+  country: string
+  currency: string
+  amount: number
+  /** MSISDN normalisé, sans le « + ». */
+  phone: string
+  mmo_provider: string
+  status: 'pending' | 'completed' | 'failed'
+  failure_code: string | null
+  failure_reason: string | null
+  provider_transaction_id: string | null
+  requested_by: string | null
+  created_at: string
+  updated_at: string
+}

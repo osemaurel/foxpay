@@ -23,6 +23,7 @@ const TABS = [
   { to: '/admin', label: 'Accueil', end: true },
   { to: '/admin/produits', label: 'Produits', end: false },
   { to: '/admin/ventes', label: 'Ventes', end: false },
+  { to: '/admin/retraits', label: 'Retraits', end: false },
   { to: '/admin/parametres', label: 'Paramètres', end: false },
 ]
 

@@ -461,6 +461,156 @@ export async function getDeposit(depositId: string): Promise<DepositState | null
   }
 }
 
+// ============================================================
+// Portefeuilles et retraits
+// ============================================================
+
+export type Solde = {
+  /** ISO alpha-3. */
+  country: string
+  currency: string
+  balance: number
+}
+
+/**
+ * Les soldes du compte, **un portefeuille par pays et par devise**.
+ *
+ * Ce n'est pas une cagnotte unique : l'argent encaissé en Côte d'Ivoire reste
+ * dans le portefeuille ivoirien, et un retrait vers un numéro donné débite le
+ * portefeuille du pays de ce numéro. Regrouper les portefeuilles se fait depuis
+ * le tableau de bord pawaPay, pas par l'API.
+ */
+export async function getBalances(): Promise<Solde[]> {
+  const res = await fetch(`${baseUrl()}/v2/wallet-balances`, { headers: headers() })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`pawaPay ${res.status} : ${text}`)
+
+  const payload = JSON.parse(text) as {
+    balances?: { country: string; currency: string; balance: string }[]
+  }
+
+  return (payload.balances ?? []).map((b) => ({
+    country: b.country,
+    currency: b.currency,
+    balance: Number(b.balance),
+  }))
+}
+
+export type PayoutCreated = {
+  status: 'ACCEPTED' | 'ENQUEUED' | 'REJECTED' | 'DUPLICATE_IGNORED' | 'UNKNOWN'
+  failureCode: string | null
+  failureReason: string | null
+}
+
+/**
+ * Demande le virement. Comme pour un dépôt, un HTTP 200 ne veut pas dire
+ * accepté : le verdict est dans le corps.
+ *
+ * `payoutId` doit être enregistré chez nous **avant** cet appel. C'est lui qui
+ * rend la requête idempotente — la renvoyer ne crée pas un second virement —
+ * et c'est lui qui permet de retrouver l'argent si la réponse se perd.
+ */
+export async function createPayout(input: {
+  payoutId: string
+  amount: string
+  currency: string
+  phoneNumber: string
+  provider: string
+  customerMessage?: string
+}): Promise<PayoutCreated> {
+  const res = await fetch(`${baseUrl()}/v2/payouts`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      payoutId: input.payoutId,
+      amount: input.amount,
+      currency: input.currency,
+      recipient: {
+        type: 'MMO',
+        accountDetails: { phoneNumber: input.phoneNumber, provider: input.provider },
+      },
+      customerMessage: sanitizeCustomerMessage(input.customerMessage ?? 'Retrait'),
+    }),
+  })
+
+  const text = await res.text()
+  let data: Record<string, any> = {}
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error(`Réponse pawaPay illisible (${res.status}) : ${text}`)
+  }
+
+  // Un 5xx sans statut ne prouve rien : le virement est peut-être parti. On ne
+  // conclut pas — le retrait reste en attente et son statut sera redemandé.
+  if (res.status >= 500 && !data.status) {
+    return { status: 'UNKNOWN', failureCode: null, failureReason: null }
+  }
+
+  return {
+    status: (data.status as PayoutCreated['status']) ?? 'UNKNOWN',
+    failureCode: data.failureReason?.failureCode ?? null,
+    failureReason: data.failureReason?.failureMessage ?? (res.ok ? null : text),
+  }
+}
+
+export type PayoutStatus =
+  | 'ACCEPTED'
+  | 'ENQUEUED'
+  | 'PROCESSING'
+  | 'IN_RECONCILIATION'
+  | 'COMPLETED'
+  | 'FAILED'
+
+export type PayoutState = {
+  status: PayoutStatus
+  providerTransactionId: string | null
+  failureCode: string | null
+  failureReason: string | null
+}
+
+/**
+ * L'état réel d'un retrait chez pawaPay. Même principe que pour les dépôts :
+ * c'est la source de vérité, un corps de callback ne l'est pas.
+ *
+ * Renvoie null quand pawaPay ne connaît pas ce retrait — la demande n'est
+ * jamais partie.
+ */
+export async function getPayout(payoutId: string): Promise<PayoutState | null> {
+  const res = await fetch(`${baseUrl()}/v2/payouts/${payoutId}`, { headers: headers() })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`pawaPay ${res.status} : ${text}`)
+
+  const payload = JSON.parse(text)
+  if (payload.status === 'NOT_FOUND') return null
+  if (payload.status !== 'FOUND' || !payload.data) {
+    throw new Error(`Réponse pawaPay inattendue : ${text}`)
+  }
+
+  const data = payload.data
+  return {
+    status: data.status as PayoutStatus,
+    providerTransactionId: data.providerTransactionId ?? null,
+    failureCode: data.failureReason?.failureCode ?? null,
+    failureReason: data.failureReason?.failureMessage ?? null,
+  }
+}
+
+/** Extrait le payoutId d'un callback, quelle que soit son enveloppe. */
+export function extractPayoutId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+
+  const direct = (payload as Record<string, unknown>).payoutId
+  if (typeof direct === 'string') return direct
+
+  const data = (payload as Record<string, unknown>).data
+  if (data && typeof data === 'object') {
+    const nested = (data as Record<string, unknown>).payoutId
+    if (typeof nested === 'string') return nested
+  }
+  return null
+}
+
 /** Extrait le depositId d'un callback, quelle que soit son enveloppe. */
 export function extractDepositId(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
