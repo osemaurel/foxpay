@@ -396,9 +396,11 @@ function EmailAcheteur({ order, kind }: { order: Order; kind: 'delivery' | 'retr
       >
         {etat === 'busy' ? '…' : libelle}
       </button>
-      {kind === 'retry' && etat === 'idle' && !error && (
+      {etat === 'idle' && !error && (
         <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-          Un lien pour reprendre l'achat, envoyé à {order.buyer_email}.
+          {kind === 'retry'
+            ? `Un lien pour reprendre l'achat, envoyé à ${order.buyer_email}.`
+            : `Le lien de téléchargement repart pour 7 jours, à ${order.buyer_email}.`}
         </p>
       )}
       {error && <p className="mt-2 text-xs leading-relaxed text-stop">{error}</p>}
