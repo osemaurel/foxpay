@@ -198,22 +198,29 @@ export type CountryConf = {
  * La documentation décrit `operationTypes` comme un objet, mais un exemple le
  * montre en tableau. On accepte les deux plutôt que de parier.
  */
-function readDeposit(operationTypes: unknown): Record<string, unknown> | null {
+function readOperation(
+  operationTypes: unknown,
+  type: 'DEPOSIT' | 'PAYOUT',
+): Record<string, unknown> | null {
   if (!operationTypes || typeof operationTypes !== 'object') return null
 
   if (Array.isArray(operationTypes)) {
     for (const entry of operationTypes) {
       if (!entry || typeof entry !== 'object') continue
       const record = entry as Record<string, unknown>
-      if (record.DEPOSIT) return record.DEPOSIT as Record<string, unknown>
-      if (record.operationType === 'DEPOSIT') return record
+      if (record[type]) return record[type] as Record<string, unknown>
+      if (record.operationType === type) return record
     }
     return null
   }
 
-  const deposit = (operationTypes as Record<string, unknown>).DEPOSIT
-  return deposit && typeof deposit === 'object' ? (deposit as Record<string, unknown>) : null
+  const operation = (operationTypes as Record<string, unknown>)[type]
+  return operation && typeof operation === 'object'
+    ? (operation as Record<string, unknown>)
+    : null
 }
+
+const readDeposit = (operationTypes: unknown) => readOperation(operationTypes, 'DEPOSIT')
 
 function toNumber(value: unknown): number | null {
   const parsed = Number(value)
@@ -494,6 +501,67 @@ export async function getBalances(): Promise<Solde[]> {
     currency: b.currency,
     balance: Number(b.balance),
   }))
+}
+
+export type MethodeRetrait = {
+  /** ISO alpha-3 du portefeuille qui sera débité. */
+  country: string
+  /** Identifiant pawaPay : MTN_MOMO_BEN, MOOV_BEN… */
+  provider: string
+  /** Nom tel que le vendeur le reconnaît. */
+  name: string
+  currency: string
+  minAmount: number | null
+  maxAmount: number | null
+  /** Un opérateur CLOSED ne peut rien recevoir pour l'instant. */
+  status: 'OPERATIONAL' | 'DELAYED' | 'CLOSED'
+}
+
+/**
+ * Les méthodes vers lesquelles le compte peut virer, telles que pawaPay les
+ * déclare — pas une liste écrite en dur.
+ *
+ * On demande explicitement la configuration des **retraits** : un opérateur qui
+ * sait encaisser ne sait pas forcément verser, et proposer l'un pour l'autre
+ * ferait échouer le virement au dernier moment.
+ */
+export async function getPayoutMethods(): Promise<MethodeRetrait[]> {
+  const res = await fetch(`${baseUrl()}/v2/active-conf?operationType=PAYOUT`, {
+    headers: headers(),
+  })
+  const text = await res.text()
+  if (!res.ok) throw new Error(`pawaPay ${res.status} : ${text}`)
+
+  const countries = (JSON.parse(text) as { countries?: unknown[] }).countries
+  if (!Array.isArray(countries)) return []
+
+  const methodes: MethodeRetrait[] = []
+
+  for (const raw of countries) {
+    const entry = raw as Record<string, any>
+
+    for (const rawProvider of entry.providers ?? []) {
+      const provider = rawProvider as Record<string, any>
+
+      for (const rawCurrency of provider.currencies ?? []) {
+        const currency = rawCurrency as Record<string, any>
+        const payout = readOperation(currency.operationTypes, 'PAYOUT')
+        if (!payout) continue
+
+        methodes.push({
+          country: entry.country,
+          provider: provider.provider,
+          name: provider.displayName ?? provider.provider,
+          currency: currency.currency,
+          minAmount: toNumber(payout.minAmount ?? payout.minTransactionLimit),
+          maxAmount: toNumber(payout.maxAmount ?? payout.maxTransactionLimit),
+          status: (payout.status as MethodeRetrait['status']) ?? 'OPERATIONAL',
+        })
+      }
+    }
+  }
+
+  return methodes
 }
 
 export type PayoutCreated = {

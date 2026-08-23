@@ -1,6 +1,11 @@
 import { admin } from '../_shared/admin.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
-import { createPayout, getBalances, predictProvider } from '../_shared/pawapay.ts'
+import {
+  createPayout,
+  getBalances,
+  getPayoutMethods,
+  predictProvider,
+} from '../_shared/pawapay.ts'
 import { reglerRetrait } from '../_shared/retrait.ts'
 
 /**
@@ -26,7 +31,13 @@ Deno.serve(async (req) => {
   const { data: auth } = await admin.auth.getUser(jeton)
   if (!auth?.user) return fail('Session expirée', 401)
 
-  let body: { action?: string; phone?: string; amount?: number; payout_id?: string }
+  let body: {
+    action?: string
+    phone?: string
+    amount?: number
+    methode?: string
+    payout_id?: string
+  }
   try {
     body = await req.json()
   } catch {
@@ -44,11 +55,22 @@ Deno.serve(async (req) => {
 
   try {
     switch (body.action) {
-      case 'soldes':
-        return json({ soldes: await getBalances() })
+      case 'soldes': {
+        // Les deux ensemble : une méthode sans son solde ne se choisit pas, et
+        // les demander séparément laisserait la page afficher un instant une
+        // liste qui ne correspond plus aux portefeuilles.
+        const [soldes, methodes] = await Promise.all([getBalances(), getPayoutMethods()])
+        return json({ soldes, methodes })
+      }
 
       case 'creer':
-        return await creer(shop.id, auth.user.id, body.phone ?? '', Number(body.amount))
+        return await creer(
+          shop.id,
+          auth.user.id,
+          body.methode ?? '',
+          body.phone ?? '',
+          Number(body.amount),
+        )
 
       case 'statut': {
         const id = body.payout_id?.trim()
@@ -88,9 +110,11 @@ Deno.serve(async (req) => {
 async function creer(
   shopId: string,
   userId: string,
+  methodeChoisie: string,
   phone: string,
   montant: number,
 ): Promise<Response> {
+  if (!methodeChoisie.trim()) return fail('Méthode de retrait manquante')
   if (!phone.trim()) return fail('Numéro manquant')
   if (!Number.isFinite(montant) || montant <= 0) return fail('Montant invalide')
 
@@ -107,29 +131,57 @@ async function creer(
     return fail('Un retrait est déjà en cours. Attends qu\'il soit tranché.', 409)
   }
 
-  // pawaPay reconnaît le numéro, le normalise et dit à quel opérateur il est
-  // rattaché : c'est plus sûr que de le demander au vendeur, et ça donne le
-  // pays, donc le portefeuille à débiter.
-  const numero = await predictProvider(phone.replace(/\D/g, ''))
-  if (!numero) {
-    return fail("Ce numéro n'est rattaché à aucun opérateur mobile money connu.")
+  // La méthode est le choix du vendeur, et c'est elle qui commande : elle donne
+  // l'opérateur destinataire, le pays, donc le portefeuille débité. On la
+  // revérifie contre le catalogue de pawaPay — un identifiant fabriqué à la
+  // main ne doit pas pouvoir désigner un portefeuille au hasard.
+  const [soldes, methodes] = await Promise.all([getBalances(), getPayoutMethods()])
+
+  const methode = methodes.find((m) => m.provider === methodeChoisie)
+  if (!methode) return fail('Cette méthode de retrait n\'existe pas.', 409)
+
+  if (methode.status === 'CLOSED') {
+    return fail(`${methode.name} ne reçoit pas de virement en ce moment.`, 409)
   }
 
-  // Le portefeuille du pays de ce numéro. Quand un pays en a plusieurs (la RDC
-  // a un compte en francs congolais et un en dollars), on prend le mieux garni.
-  const soldes = await getBalances()
-  const portefeuille = soldes
-    .filter((s) => s.country === numero.country)
-    .sort((a, b) => b.balance - a.balance)[0]
+  const portefeuille = soldes.find(
+    (s) => s.country === methode.country && s.currency === methode.currency,
+  )
 
   if (!portefeuille) {
-    return fail(`Aucun portefeuille pawaPay pour ${numero.country}.`, 409)
+    return fail(`Aucun portefeuille pawaPay pour ${methode.country}.`, 409)
   }
 
   if (montant > portefeuille.balance) {
     return fail(
-      `Solde insuffisant : ${portefeuille.balance} ${portefeuille.currency} disponible sur le portefeuille ${numero.country}.`,
+      `Solde insuffisant : ${portefeuille.balance} ${portefeuille.currency} disponible sur le portefeuille ${methode.country}.`,
       409,
+    )
+  }
+
+  // Les bornes de l'opérateur, dites tout de suite plutôt que par un rejet
+  // quelques secondes plus tard.
+  if (methode.minAmount !== null && montant < methode.minAmount) {
+    return fail(`${methode.name} n'accepte pas moins de ${methode.minAmount} ${methode.currency}.`)
+  }
+  if (methode.maxAmount !== null && montant > methode.maxAmount) {
+    return fail(
+      `${methode.name} n'accepte pas plus de ${methode.maxAmount} ${methode.currency} par virement.`,
+    )
+  }
+
+  // pawaPay valide et normalise le numéro. On garde son verdict sur le **pays**
+  // — envoyer un numéro ivoirien sur le portefeuille béninois n'a pas de sens —
+  // mais pas sur l'opérateur : un numéro porté est deviné à côté, et c'est le
+  // vendeur qui sait à quel portefeuille son numéro est rattaché.
+  const numero = await predictProvider(phone.replace(/\D/g, ''))
+  if (!numero) {
+    return fail("Ce numéro n'est reconnu par aucun opérateur mobile money.")
+  }
+
+  if (numero.country !== methode.country) {
+    return fail(
+      `Ce numéro est enregistré en ${numero.country}, pas en ${methode.country}. Choisis la méthode correspondante.`,
     )
   }
 
@@ -138,11 +190,11 @@ async function creer(
     .insert({
       shop_id: shopId,
       provider: 'pawapay',
-      country: numero.country,
+      country: methode.country,
       currency: portefeuille.currency,
       amount: montant,
       phone: numero.phoneNumber,
-      mmo_provider: numero.provider,
+      mmo_provider: methode.provider,
       requested_by: userId,
     })
     .select('id')
@@ -159,7 +211,7 @@ async function creer(
       amount: String(Math.round(montant)),
       currency: portefeuille.currency,
       phoneNumber: numero.phoneNumber,
-      provider: numero.provider,
+      provider: methode.provider,
       customerMessage: 'Retrait foxpay',
     })
   } catch (e) {

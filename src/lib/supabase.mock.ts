@@ -444,6 +444,18 @@ export async function callFunction<T>(name: string, body?: unknown): Promise<T> 
  * besoin : ses soldes vivent chez pawaPay, pas en base, donc ils ne peuvent
  * pas venir des tables ci-dessus.
  */
+const m = (country: string, provider: string, name: string, currency: string) => ({
+  country,
+  provider,
+  name,
+  currency,
+  // pawaPay ne publie pas de bornes sur les retraits : la vraie réponse n'en a
+  // pas non plus.
+  minAmount: null as number | null,
+  maxAmount: null as number | null,
+  status: 'OPERATIONAL' as const,
+})
+
 export async function callFunctionAuth<T>(name: string, body?: unknown): Promise<T> {
   const params = (body ?? {}) as { action?: string }
 
@@ -454,6 +466,14 @@ export async function callFunctionAuth<T>(name: string, body?: unknown): Promise
         { country: 'CMR', currency: 'XAF', balance: 22204 },
         { country: 'COD', currency: 'CDF', balance: 141909 },
         { country: 'SEN', currency: 'XOF', balance: 0 },
+      ],
+      methodes: [
+        m('BEN', 'MTN_MOMO_BEN', 'MTN MoMo', 'XOF'),
+        m('BEN', 'MOOV_BEN', 'Moov Money', 'XOF'),
+        m('CMR', 'MTN_MOMO_CMR', 'MTN MoMo', 'XAF'),
+        m('COD', 'VODACOM_MPESA_COD', 'Vodacom M-Pesa', 'CDF'),
+        m('COD', 'AIRTEL_COD', 'Airtel Money', 'CDF'),
+        m('SEN', 'ORANGE_SEN', 'Orange Money', 'XOF'),
       ],
     } as T
   }

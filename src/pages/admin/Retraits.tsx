@@ -13,12 +13,24 @@ import { useAdmin } from './AdminLayout'
  * nous : entre les commissions retenues et les versements déjà partis, notre
  * total et le leur ne peuvent pas coïncider, et c'est le leur qui fait foi.
  *
- * Un portefeuille par pays. Le pays n'est pas demandé au vendeur : il est déduit
- * du numéro par pawaPay, qui en donne aussi l'opérateur. Un numéro béninois
- * débite donc le portefeuille béninois, et lui seul. Regrouper les
- * portefeuilles se fait depuis le tableau de bord pawaPay.
+ * Un portefeuille par pays, et c'est la méthode choisie qui désigne lequel sera
+ * débité. La liste des méthodes vient de pawaPay, filtrée sur celles qui savent
+ * **recevoir** un virement — savoir encaisser ne suffit pas — et sur les pays
+ * où il reste quelque chose. Regrouper les portefeuilles se fait depuis le
+ * tableau de bord pawaPay.
  */
 type Solde = { country: string; currency: string; balance: number }
+
+type Methode = {
+  country: string
+  /** Identifiant pawaPay : MTN_MOMO_BEN, MOOV_BEN… */
+  provider: string
+  name: string
+  currency: string
+  minAmount: number | null
+  maxAmount: number | null
+  status: 'OPERATIONAL' | 'DELAYED' | 'CLOSED'
+}
 
 /** Les deux francs CFA s'écrivent FCFA ; le reste garde son code ISO. */
 const SIGLES: Record<string, string> = { XOF: 'FCFA', XAF: 'FCFA' }
@@ -29,6 +41,7 @@ const montantLisible = (valeur: number, devise: string) =>
 export default function Retraits() {
   const { shop } = useAdmin()
   const [soldes, setSoldes] = useState<Solde[] | null>(null)
+  const [methodes, setMethodes] = useState<Methode[]>([])
   const [erreurSoldes, setErreurSoldes] = useState<string | null>(null)
   const [retraits, setRetraits] = useState<Payout[]>([])
 
@@ -44,10 +57,12 @@ export default function Retraits() {
   const chargerSoldes = useCallback(async () => {
     setErreurSoldes(null)
     try {
-      const { soldes } = await callFunctionAuth<{ soldes: Solde[] }>('retraits', {
-        action: 'soldes',
-      })
-      setSoldes(soldes)
+      const reponse = await callFunctionAuth<{ soldes: Solde[]; methodes: Methode[] }>(
+        'retraits',
+        { action: 'soldes' },
+      )
+      setSoldes(reponse.soldes)
+      setMethodes(reponse.methodes)
     } catch (e) {
       setErreurSoldes((e as Error).message)
       setSoldes([])
@@ -112,7 +127,7 @@ export default function Retraits() {
               ))}
             </div>
             <p className="mt-4 text-xs leading-relaxed text-ink-faint">
-              Un portefeuille par pays. Un retrait débite celui du pays de ton numéro : pour
+              Un portefeuille par pays. Un retrait débite celui de la méthode choisie : pour
               tout sortir d'un seul coup, regroupe d'abord les portefeuilles depuis le tableau
               de bord pawaPay.
             </p>
@@ -120,7 +135,7 @@ export default function Retraits() {
         )}
       </Card>
 
-      <Demande soldes={garnis} onFait={async () => {
+      <Demande soldes={garnis} methodes={methodes} onFait={async () => {
         await chargerRetraits()
         await chargerSoldes()
       }} />
@@ -130,7 +145,16 @@ export default function Retraits() {
   )
 }
 
-function Demande({ soldes, onFait }: { soldes: Solde[]; onFait: () => Promise<void> }) {
+function Demande({
+  soldes,
+  methodes,
+  onFait,
+}: {
+  soldes: Solde[]
+  methodes: Methode[]
+  onFait: () => Promise<void>
+}) {
+  const [methode, setMethode] = useState('')
   const [phone, setPhone] = useState('')
   const [montant, setMontant] = useState('')
   const [etat, setEtat] = useState<'idle' | 'busy'>('idle')
@@ -143,6 +167,7 @@ function Demande({ soldes, onFait }: { soldes: Solde[]; onFait: () => Promise<vo
     try {
       await callFunctionAuth('retraits', {
         action: 'creer',
+        methode,
         phone,
         amount: Number(montant),
       })
@@ -155,14 +180,55 @@ function Demande({ soldes, onFait }: { soldes: Solde[]; onFait: () => Promise<vo
     }
   }
 
-  const disponible = soldes.some((s) => s.balance > 0)
+  // On ne propose que ce qui peut réellement partir : un opérateur dont le
+  // portefeuille est vide n'est pas une méthode de retrait, c'est une déception.
+  const proposables = methodes.filter(
+    (m) =>
+      m.status !== 'CLOSED' &&
+      soldes.some(
+        (s) => s.country === m.country && s.currency === m.currency && s.balance > 0,
+      ),
+  )
+
+  const choisie = proposables.find((m) => m.provider === methode)
+  const portefeuille = choisie
+    ? soldes.find((s) => s.country === choisie.country && s.currency === choisie.currency)
+    : undefined
+
+  const disponible = proposables.length > 0
 
   return (
     <Card title="Faire un retrait">
       <form onSubmit={lancer} className="space-y-5">
         <Field
+          label="Méthode de retrait"
+          hint={
+            choisie
+              ? `Débite le portefeuille ${nomPays(choisie.country)}${
+                  portefeuille ? ` — ${montantLisible(portefeuille.balance, portefeuille.currency)}` : ''
+                }.`
+              : 'Là où pawaPay enverra l\'argent.'
+          }
+        >
+          <select
+            className={inputClass}
+            value={methode}
+            onChange={(e) => setMethode(e.target.value)}
+            required
+          >
+            <option value="">Choisis ta méthode</option>
+            {proposables.map((m) => (
+              <option key={`${m.country}-${m.provider}`} value={m.provider}>
+                {m.name} · {nomPays(m.country)}
+                {m.status === 'DELAYED' ? ' (retards en cours)' : ''}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field
           label="Ton numéro mobile money"
-          hint="Avec l'indicatif, sans le « + ». L'opérateur et le pays en sont déduits."
+          hint="Avec l'indicatif, sans le « + ». Il doit être du pays de la méthode choisie."
         >
           <input
             className={inputClass}
@@ -174,7 +240,17 @@ function Demande({ soldes, onFait }: { soldes: Solde[]; onFait: () => Promise<vo
           />
         </Field>
 
-        <Field label="Montant" hint="Dans la devise du portefeuille de ce pays.">
+        <Field
+          label="Montant"
+          hint={
+            choisie && choisie.minAmount !== null && choisie.maxAmount !== null
+              ? `Entre ${choisie.minAmount.toLocaleString('fr-FR')} et ${montantLisible(
+                  choisie.maxAmount,
+                  choisie.currency,
+                )} par virement.`
+              : 'Dans la devise du portefeuille de la méthode choisie.'
+          }
+        >
           <input
             className={inputClass}
             value={montant}
@@ -193,7 +269,7 @@ function Demande({ soldes, onFait }: { soldes: Solde[]; onFait: () => Promise<vo
 
         {!disponible && (
           <p className="text-xs text-ink-faint">
-            Aucun portefeuille n'a de solde positif.
+            Aucune méthode disponible : tous les portefeuilles sont à zéro.
           </p>
         )}
       </form>
