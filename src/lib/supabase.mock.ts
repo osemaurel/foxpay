@@ -228,11 +228,50 @@ const reviews: Review[] = AVIS.map(([produit, nom, detail, note, texte], i) => (
 
 type Row = Record<string, unknown>
 
+/** Deux retraits, pour que la page ne soit pas vide dans l'aperçu. */
+const payouts = [
+  {
+    id: 'payout-1',
+    shop_id: shop.id,
+    provider: 'pawapay',
+    country: 'BEN',
+    currency: 'XOF',
+    amount: 50000,
+    phone: '22997000000',
+    mmo_provider: 'MTN_MOMO_BEN',
+    status: 'completed',
+    failure_code: null,
+    failure_reason: null,
+    provider_transaction_id: 'demo-1',
+    requested_by: 'user-1',
+    created_at: daysAgo(3),
+    updated_at: daysAgo(3),
+  },
+  {
+    id: 'payout-2',
+    shop_id: shop.id,
+    provider: 'pawapay',
+    country: 'BEN',
+    currency: 'XOF',
+    amount: 25000,
+    phone: '22997000000',
+    mmo_provider: 'MTN_MOMO_BEN',
+    status: 'failed',
+    failure_code: 'PAYEE_LIMIT_REACHED',
+    failure_reason: 'The recipient wallet has reached its limit.',
+    provider_transaction_id: null,
+    requested_by: 'user-1',
+    created_at: daysAgo(9),
+    updated_at: daysAgo(9),
+  },
+]
+
 const TABLES: Record<string, Row[]> = {
   shops: [shop] as unknown as Row[],
   products: products as unknown as Row[],
   orders: orders as unknown as Row[],
   reviews: reviews as unknown as Row[],
+  payouts: payouts as unknown as Row[],
 }
 
 /**
@@ -398,4 +437,26 @@ export async function callFunction<T>(name: string, body?: unknown): Promise<T> 
   }
 
   throw new Error(`Aperçu : la fonction « ${name} » n'est pas branchée.`)
+}
+
+/**
+ * Les appels authentifiés de l'administration. Seule la page des retraits en a
+ * besoin : ses soldes vivent chez pawaPay, pas en base, donc ils ne peuvent
+ * pas venir des tables ci-dessus.
+ */
+export async function callFunctionAuth<T>(name: string, body?: unknown): Promise<T> {
+  const params = (body ?? {}) as { action?: string }
+
+  if (name === 'retraits' && params.action === 'soldes') {
+    return {
+      soldes: [
+        { country: 'BEN', currency: 'XOF', balance: 486300 },
+        { country: 'CMR', currency: 'XAF', balance: 22204 },
+        { country: 'COD', currency: 'CDF', balance: 141909 },
+        { country: 'SEN', currency: 'XOF', balance: 0 },
+      ],
+    } as T
+  }
+
+  throw new Error(`Aperçu : la fonction « ${name} » ne part pas d'ici.`)
 }

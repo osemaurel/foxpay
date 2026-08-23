@@ -14,6 +14,7 @@ import ProductsList from './pages/admin/ProductsList'
 import ProductEdit from './pages/admin/ProductEdit'
 import SalesPage from './pages/admin/SalesPage'
 import SettingsPage from './pages/admin/SettingsPage'
+import Retraits from './pages/admin/Retraits'
 import '@fontsource-variable/inter'
 import '@fontsource-variable/geist-mono'
 import './index.css'
@@ -41,7 +42,7 @@ const SCREENS = [
   {
     id: 'admin',
     label: 'Administration',
-    note: 'Quatre onglets, navigables ici même. Les champs sont modifiables : change la couleur d’accent dans Paramètres, enregistre, puis reviens sur la page boutique.',
+    note: 'Cinq onglets, navigables ici même. Les champs sont modifiables : change la couleur d’accent dans Paramètres, enregistre, puis reviens sur la page boutique.',
     render: () => (
       <MemoryRouter initialEntries={['/admin']}>
         <Routes>
@@ -51,6 +52,7 @@ const SCREENS = [
             <Route path="produits/nouveau" element={<ProductEdit />} />
             <Route path="produits/:productId" element={<ProductEdit />} />
             <Route path="ventes" element={<SalesPage />} />
+            <Route path="retraits" element={<Retraits />} />
             <Route path="parametres" element={<SettingsPage />} />
           </Route>
         </Routes>
