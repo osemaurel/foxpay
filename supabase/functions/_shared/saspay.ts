@@ -6,8 +6,9 @@ import { requireEnv } from './admin.ts'
  * Écrit contre la documentation officielle (docs.saspay.me).
  *
  * Troisième processeur, choisi pour varier les routes : quand un opérateur
- * tombe chez l'un, l'autre peut souvent encore encaisser. Il apporte aussi le
- * Togo, le Mali et le Niger, que le compte pawaPay ne sert pas.
+ * tombe chez l'un, un autre peut souvent encore encaisser. Il ne débloque
+ * aucun pays nouveau — les quatorze que vend la boutique sont déjà couverts —
+ * mais il donne une seconde ou une troisième main sur chacun.
  *
  * Trois choses le distinguent des deux autres, et expliquent ce fichier :
  *
@@ -105,13 +106,20 @@ function lireErreur(
 // Catalogue
 // ============================================================
 
+/**
+ * Un pays du référentiel. Les noms de champs sont ceux de leur réponse réelle,
+ * pas ceux de la documentation : `iso_code` et non `code`, `default_currency`
+ * et non `currency`, et **aucun indicatif téléphonique** — vérifié en direct
+ * contre l'API.
+ */
 export type SasPayCountry = {
   id: string
   name: string
   /** ISO alpha-2. */
-  code: string
-  currency: string
-  phone_code?: string
+  iso_code: string
+  default_currency: string
+  /** Le référentiel contient des pays réservés à un usage futur (Autriche…). */
+  is_active: boolean
 }
 
 export type SasPayNetwork = {
@@ -119,8 +127,9 @@ export type SasPayNetwork = {
   name: string
   /** Ce qu'attend `network` sur un paiement : `mtn_bj`, `wave_ci`… */
   code: string
-  country: unknown
-  is_active?: boolean
+  /** L'identifiant du pays, pas son code : une jointure à faire nous-mêmes. */
+  country: string
+  is_active: boolean
 }
 
 /** Catalogue public : c'est le seul endpoint qui ne demande pas de clé. */

@@ -32,6 +32,20 @@ const ALPHA2_VERS_ALPHA3: Record<string, string> = {
   MW: 'MWI', RW: 'RWA', ZM: 'ZMB',
 }
 
+/**
+ * Indicatifs téléphoniques, sans le « + ».
+ *
+ * pawaPay et SebPay les fournissent, SasPay non. Sans cette table, un pays
+ * servi par lui seul — le Togo, le Mali, le Niger — s'afficherait sur la page
+ * de paiement avec un champ téléphone sans préfixe.
+ */
+const INDICATIFS: Record<string, string> = {
+  BEN: '229', BFA: '226', CIV: '225', CMR: '237', COD: '243', COG: '242',
+  GAB: '241', GHA: '233', GIN: '224', GMB: '220', GNB: '245', KEN: '254',
+  MLI: '223', MWI: '265', NER: '227', NGA: '234', RWA: '250', SEN: '221',
+  TGO: '228', TZA: '255', UGA: '256', ZMB: '260',
+}
+
 /** Noms français, quand aucun processeur n'en fournit un présentable. */
 export const NOMS_PAYS: Record<string, string> = {
   BEN: 'Bénin', BFA: 'Burkina Faso', CIV: "Côte d'Ivoire", CMR: 'Cameroun',
@@ -334,26 +348,22 @@ function ajouterSebpay(index: Map<string, Methode>, catalogue: CatalogueSebpay) 
 }
 
 function ajouterSaspay(index: Map<string, Methode>, catalogue: CatalogueSaspay) {
-  const parAlpha2 = new Map(catalogue.pays.map((p) => [p.code, p]))
+  // Le réseau ne porte que l'identifiant de son pays : la jointure est à faire
+  // ici, le référentiel ne l'imbrique pas.
+  const parId = new Map(catalogue.pays.map((p) => [p.id, p]))
 
   for (const r of catalogue.reseaux) {
     // Un réseau au catalogue mais routé vers aucun gateway ferait échouer le
     // paiement au dernier moment, avec un « invalid_method ».
-    if (r.is_active === false) continue
+    if (!r.is_active) continue
 
-    // Le pays arrive tantôt en objet imbriqué, tantôt en simple identifiant.
-    const paysBrut = r.country as { code?: string; id?: string } | string | null
-    const alpha2 =
-      typeof paysBrut === 'string'
-        ? catalogue.pays.find((p) => p.id === paysBrut)?.code
-        : paysBrut?.code ??
-          catalogue.pays.find((p) => p.id === paysBrut?.id)?.code
+    // Le référentiel liste aussi des pays réservés à un usage futur, sans
+    // aucun réseau actif — l'Autriche y figure.
+    const pays = parId.get(r.country)
+    if (!pays || !pays.is_active || !pays.default_currency) continue
 
-    if (!alpha2) continue
-
-    const pays = parAlpha2.get(alpha2)
-    const country = ALPHA2_VERS_ALPHA3[alpha2]
-    if (!pays || !country || !pays.currency) continue
+    const country = ALPHA2_VERS_ALPHA3[pays.iso_code]
+    if (!country) continue
 
     const method = methodeCanonique(r.code)
     const cle = `${country}:${method}`
@@ -361,9 +371,11 @@ function ajouterSaspay(index: Map<string, Methode>, catalogue: CatalogueSaspay) 
     const methode: Methode = index.get(cle) ?? {
       country,
       countryName: NOMS_PAYS[country] ?? pays.name,
-      prefix: String(pays.phone_code ?? '').replace(/^\+/, ''),
+      // SasPay ne publie pas d'indicatif : il vient de notre table, sans quoi
+      // la page de paiement afficherait un champ téléphone sans préfixe.
+      prefix: INDICATIFS[country] ?? '',
       flag: null,
-      currency: pays.currency,
+      currency: pays.default_currency,
       method,
       name: r.name,
       logo: null,
@@ -372,7 +384,7 @@ function ajouterSaspay(index: Map<string, Methode>, catalogue: CatalogueSaspay) 
       saspay: null,
     }
 
-    methode.saspay ??= { code: r.code, alpha2 }
+    methode.saspay ??= { code: r.code, alpha2: pays.iso_code }
     index.set(cle, methode)
   }
 }
