@@ -347,6 +347,22 @@ function ajouterSebpay(index: Map<string, Methode>, catalogue: CatalogueSebpay) 
   }
 }
 
+/**
+ * SasPay vient **doubler** des méthodes existantes, jamais en ajouter.
+ *
+ * Son référentiel est plus large que celui des deux autres, et le déployer tel
+ * quel a fait apparaître sur la boutique des opérateurs qu'on ne maîtrise pas :
+ * des doublons de marque — Vodafone Ghana **est** Telecel Ghana, Togocel et
+ * Mixx sont T-Money — que l'acheteur aurait vus deux ou trois fois dans la même
+ * liste ; et des réseaux à code OTP, comme Wizall au Sénégal, dont nous ne
+ * demandons jamais le code. Un acheteur les choisissant serait débité sans que
+ * le paiement puisse aboutir.
+ *
+ * Le rôle de ce troisième processeur est de donner une seconde main sur ce que
+ * la boutique vend déjà, pas d'élargir le catalogue. Une méthode que ni pawaPay
+ * ni SebPay ne connaît est donc ignorée : c'est exactement la règle qui rend
+ * les deux problèmes ci-dessus impossibles, au lieu de les rattraper un par un.
+ */
 function ajouterSaspay(index: Map<string, Methode>, catalogue: CatalogueSaspay) {
   // Le réseau ne porte que l'identifiant de son pays : la jointure est à faire
   // ici, le référentiel ne l'imbrique pas.
@@ -366,26 +382,15 @@ function ajouterSaspay(index: Map<string, Methode>, catalogue: CatalogueSaspay) 
     if (!country) continue
 
     const method = methodeCanonique(r.code)
-    const cle = `${country}:${method}`
+    const methode = index.get(`${country}:${method}`)
 
-    const methode: Methode = index.get(cle) ?? {
-      country,
-      countryName: NOMS_PAYS[country] ?? pays.name,
-      // SasPay ne publie pas d'indicatif : il vient de notre table, sans quoi
-      // la page de paiement afficherait un champ téléphone sans préfixe.
-      prefix: INDICATIFS[country] ?? '',
-      flag: null,
-      currency: pays.default_currency,
-      method,
-      name: r.name,
-      logo: null,
-      pawapay: null,
-      sebpay: null,
-      saspay: null,
-    }
+    // Personne d'autre ne sert cette méthode : on ne l'ouvre pas.
+    if (!methode) continue
+
+    // Et pas dans une autre devise que celle déjà retenue pour ce pays.
+    if (methode.currency !== pays.default_currency) continue
 
     methode.saspay ??= { code: r.code, alpha2: pays.iso_code }
-    index.set(cle, methode)
   }
 }
 
