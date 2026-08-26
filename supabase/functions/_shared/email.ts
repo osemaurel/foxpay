@@ -117,6 +117,112 @@ ${
 }
 
 // ============================================================
+// L'acheteur qui n'a pas ouvert son lien : le rappel
+// ============================================================
+
+/**
+ * Deux rappels, et pas un de plus.
+ *
+ * Le premier part quelques minutes après l'achat : à ce moment-là, si le lien
+ * n'a pas été ouvert, c'est presque toujours que l'email de livraison n'est
+ * jamais arrivé sous les yeux de l'acheteur — classé en indésirable, ou noyé.
+ * Le second part quelques heures plus tard, pour celui qui a acheté depuis son
+ * téléphone en chemin et comptait s'en occuper plus tard.
+ *
+ * Ils ne sont pas écrits comme des relances commerciales mais comme un service :
+ * quelqu'un a payé et n'a pas son fichier, il faut le lui remettre en main.
+ * Chacun porte donc le lien lui-même, pas une invitation à revenir sur le site.
+ */
+const RAPPEL = {
+  premier: {
+    sujet: {
+      fr: (titre: string) => `Ton fichier t'attend : ${titre}`,
+      en: (titre: string) => `Your file is waiting: ${titre}`,
+    },
+    titre: {
+      fr: "Tu n'as pas encore récupéré ton fichier",
+      en: "You haven't picked up your file yet",
+    },
+    intro: {
+      fr: (titre: string) =>
+        `Ton paiement pour <strong>${titre}</strong> est bien confirmé, mais le lien de téléchargement n'a pas encore été ouvert. Le voici à nouveau :`,
+      en: (titre: string) =>
+        `Your payment for <strong>${titre}</strong> is confirmed, but your download link hasn't been opened yet. Here it is again:`,
+    },
+    astuce: {
+      fr: "Si notre premier email n'est pas arrivé, regarde dans tes courriers indésirables — c'est souvent là qu'il se cache.",
+      en: "If our first email never showed up, check your spam folder — that's usually where it ends up.",
+    },
+  },
+  second: {
+    sujet: {
+      fr: (titre: string) => `Ton fichier est toujours disponible : ${titre}`,
+      en: (titre: string) => `Your file is still available: ${titre}`,
+    },
+    titre: { fr: 'Ton fichier est toujours là', en: 'Your file is still here' },
+    intro: {
+      fr: (titre: string) =>
+        `Tu as payé <strong>${titre}</strong> il y a quelques heures et le fichier n'a toujours pas été téléchargé. Rien n'est perdu — ton lien fonctionne toujours :`,
+      en: (titre: string) =>
+        `You paid for <strong>${titre}</strong> a few hours ago and the file still hasn't been downloaded. Nothing is lost — your link still works:`,
+    },
+    astuce: {
+      fr: 'Ce lien reste valable 7 jours après ton achat. Pense à enregistrer le fichier sur ton appareil une fois ouvert.',
+      en: 'This link stays good for 7 days after your purchase. Remember to save the file to your device once it opens.',
+    },
+  },
+} as const
+
+const RAPPEL_BOUTON = { fr: 'Télécharger mon fichier', en: 'Download my file' }
+
+const RAPPEL_CONTACT = {
+  fr: (email: string) =>
+    `Le lien ne fonctionne pas ? Réponds à cet email ou écris à <a href="mailto:${email}">${email}</a>.`,
+  en: (email: string) =>
+    `Link not working? Reply to this email or write to <a href="mailto:${email}">${email}</a>.`,
+} as const
+
+export type Rappel = {
+  to: string
+  shopName: string
+  productTitle: string
+  downloadUrl: string
+  contactEmail: string | null
+  langue: Langue
+  /** 1 = celui de quelques minutes, 2 = celui de quelques heures. */
+  rang: 1 | 2
+}
+
+export function sendReminderEmail(r: Rappel): Promise<void> {
+  const texte = r.rang === 1 ? RAPPEL.premier : RAPPEL.second
+
+  return envoyer({
+    to: r.to,
+    replyTo: r.contactEmail,
+    subject: texte.sujet[r.langue](r.productTitle),
+    html: page(
+      `
+<h1 style="margin:0 0 16px;font-size:20px">${texte.titre[r.langue]}</h1>
+<p style="color:#475569;line-height:1.6;margin:0 0 24px">
+${texte.intro[r.langue](escapeHtml(r.productTitle))}</p>
+<a href="${r.downloadUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
+padding:14px;border-radius:8px;text-decoration:none;font-weight:600">${RAPPEL_BOUTON[r.langue]}</a>
+<p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">
+${texte.astuce[r.langue]}</p>
+${
+  r.contactEmail
+    ? `<p style="color:#64748b;font-size:14px;margin:16px 0 0">${RAPPEL_CONTACT[r.langue](
+        escapeHtml(r.contactEmail),
+      )}</p>`
+    : ''
+}
+<p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(r.shopName)}</p>`,
+      r.langue,
+    ),
+  })
+}
+
+// ============================================================
 // Le vendeur : sa vente
 // ============================================================
 

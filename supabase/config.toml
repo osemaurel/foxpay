@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.pawapay-payout-callback]
 verify_jwt = false
+
+[functions.rappels]
+verify_jwt = false
