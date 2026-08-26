@@ -94,7 +94,7 @@ export type Order = {
 export type Payout = {
   id: string
   shop_id: string
-  provider: 'pawapay' | 'sebpay'
+  provider: 'pawapay' | 'sebpay' | 'saspay'
   /** ISO alpha-3 du portefeuille débité. */
   country: string
   currency: string

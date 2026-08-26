@@ -4,6 +4,7 @@ import { sendDownloadEmail, sendSaleEmail } from './email.ts'
 import { lireLangue } from './langue.ts'
 import { getDeposit } from './pawapay.ts'
 import { getCollection, readStatus, SebPayError } from './sebpay.ts'
+import { lirePaiement, lireStatut, SasPayError } from './saspay.ts'
 
 /**
  * Combien de temps le lien de téléchargement reste ouvert après le paiement.
@@ -113,7 +114,9 @@ async function regler(order: Commande | null): Promise<SettleOutcome> {
     return done('paid')
   }
 
-  return order.provider === 'sebpay' ? await reglerSebpay(order) : await reglerPawapay(order)
+  if (order.provider === 'sebpay') return await reglerSebpay(order)
+  if (order.provider === 'saspay') return await reglerSaspay(order)
+  return await reglerPawapay(order)
 }
 
 // ============================================================
@@ -230,6 +233,85 @@ async function conclureSebpay(
     // SebPay ne détaille pas la cause d'un rejet : l'acheteur verra le message
     // générique, qui reste vrai — le paiement n'a pas abouti.
     await echouer(order, 'PAYMENT_REJECTED', `Collecte rejetée par SebPay (${statut}).`)
+    return done('failed', { failureCode: 'PAYMENT_REJECTED' })
+  }
+
+  await payer(order, transactionId, null)
+  return done('paid')
+}
+
+// ============================================================
+// SasPay
+// ============================================================
+
+/**
+ * Applique un statut déjà connu, sans rien redemander à SasPay.
+ *
+ * Réservé au webhook, dont la signature HMAC et l'horodatage ont été vérifiés :
+ * le corps est alors authentique et frais, redemander n'apprendrait rien. Même
+ * traitement que le webhook SebPay, et l'inverse du callback pawaPay, qui
+ * n'est pas signé.
+ */
+export async function settleSaspayWebhook(
+  paymentId: string,
+  statut: string,
+): Promise<SettleOutcome> {
+  const { data } = await admin.from('orders').select(CHAMPS).eq('deposit_id', paymentId).maybeSingle()
+  const order = data as Commande | null
+
+  if (!order) return done('unknown')
+  if (order.provider !== 'saspay') return done('unknown')
+  if (order.status === 'paid') {
+    await deliver(order)
+    return done('paid')
+  }
+  if (order.status !== 'pending') return done('failed', { failureCode: order.failure_code })
+
+  return await conclureSaspay(order, statut, null)
+}
+
+/**
+ * `deposit_id` porte l'identifiant du paiement chez SasPay, écrit dès que leur
+ * réponse arrive. Tant qu'elle n'est pas arrivée, la colonne contient encore
+ * l'UUID que la base a généré à l'insertion — que SasPay ne connaît pas. Un 404
+ * couvre donc les deux cas : identifiant jamais remplacé, ou paiement jamais
+ * créé. C'est bien ce qu'on veut dire dans les deux cas.
+ */
+async function reglerSaspay(order: Commande): Promise<SettleOutcome> {
+  let etat
+  try {
+    etat = await lirePaiement(order.deposit_id)
+  } catch (e) {
+    // 404 : SasPay ne connaît pas ce paiement. Comme ailleurs, ce n'est un
+    // échec qu'une fois passé le délai de grâce.
+    if (e instanceof SasPayError && e.status === 404) {
+      if (Date.now() - new Date(order.created_at).getTime() < GRACE_MS) return done('pending')
+
+      await echouer(order, 'NOT_FOUND', "Le paiement n'existe pas chez SasPay.")
+      return done('failed', { failureCode: 'NOT_FOUND' })
+    }
+
+    // Panne passagère : la commande reste en attente, la page réessaiera.
+    console.error('settle saspay', e)
+    return done('pending')
+  }
+
+  return await conclureSaspay(order, etat.status, etat.externalReference)
+}
+
+async function conclureSaspay(
+  order: Commande,
+  statut: string,
+  transactionId: string | null,
+): Promise<SettleOutcome> {
+  const resultat = lireStatut(statut)
+
+  if (resultat === 'pending') return done('pending')
+
+  if (resultat === 'failed') {
+    // SasPay ne détaille pas la cause d'un refus sur le statut lui-même :
+    // l'acheteur verra le message générique, qui reste vrai.
+    await echouer(order, 'PAYMENT_REJECTED', `Paiement refusé par SasPay (${statut}).`)
     return done('failed', { failureCode: 'PAYMENT_REJECTED' })
   }
 

@@ -61,14 +61,14 @@ export type LignePays = {
 /**
  * Ramène l'identifiant d'opérateur à un slug commun.
  *
- * Le même MTN arrive écrit `MTN_MOMO_CIV` par pawaPay et `mtn` par SebPay :
- * sans cette normalisation, le classement des méthodes montrerait deux lignes
- * pour un seul opérateur. C'est la copie navigateur de `methodeCanonique` des
- * Edge Functions — les deux doivent bouger ensemble.
+ * Le même MTN arrive écrit `MTN_MOMO_CIV` par pawaPay, `mtn` par SebPay et
+ * `mtn_ci` par SasPay : sans cette normalisation, le classement des méthodes
+ * montrerait trois lignes pour un seul opérateur. C'est la copie navigateur de
+ * `methodeCanonique` des Edge Functions — les deux doivent bouger ensemble.
  */
 export function methodeCanonique(code: string): string {
   const nu = code
-    .replace(/_[A-Z]{3}$/, '')
+    .replace(/_[a-z]{2,3}$/i, '')
     .toLowerCase()
     .replace(/[\s_-]+/g, '')
 
@@ -80,6 +80,7 @@ export function methodeCanonique(code: string): string {
     ezypesa: 'ezypesa',
     halopesa: 'halopesa',
     tigopesa: 'tigopesa',
+    freemoney: 'free',
   }
   return marques[nu] ?? nu
 }

@@ -4,6 +4,7 @@ import {
   nomPays,
   resolveurDeMethodes,
   type Methode,
+  type Processeur,
 } from '../_shared/catalogue.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { detectCountry } from '../_shared/geo.ts'
@@ -160,7 +161,7 @@ Deno.serve(async (req) => {
  * un opérateur à OTP est un opérateur à préautorisation, et son code USSD tient
  * lieu d'instructions.
  */
-function detailsAuthentification(m: Methode, processeur: 'pawapay' | 'sebpay') {
+function detailsAuthentification(m: Methode, processeur: Processeur) {
   if (processeur === 'pawapay' && m.pawapay) {
     return {
       auth_type: m.pawapay.authType,
@@ -168,6 +169,20 @@ function detailsAuthentification(m: Methode, processeur: 'pawapay' | 'sebpay') {
       pin_prompt_revivable: m.pawapay.pinPromptRevivable,
       instructions: m.pawapay.instructions,
       merchant_name: m.pawapay.merchantName,
+    }
+  }
+
+  // SasPay pousse la demande directement, sans code à composer d'avance : du
+  // point de vue de l'acheteur, c'est le même geste que chez pawaPay. Les rares
+  // réseaux à OTP (Wizall, Coris) ne sont pas dans ce que vend la boutique, et
+  // le catalogue n'expose de toute façon aucun indicateur pour les distinguer.
+  if (processeur === 'saspay') {
+    return {
+      auth_type: 'PROVIDER_AUTH',
+      pin_prompt: 'AUTOMATIC',
+      pin_prompt_revivable: false,
+      instructions: null,
+      merchant_name: null,
     }
   }
 

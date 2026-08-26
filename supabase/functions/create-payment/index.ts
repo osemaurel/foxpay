@@ -19,6 +19,7 @@ import {
   withFee,
 } from '../_shared/pawapay.ts'
 import { createCollection, SebPayError } from '../_shared/sebpay.ts'
+import { creerPaiement, SasPayError } from '../_shared/saspay.ts'
 
 /**
  * Demande le paiement, chez le processeur qui a la charge de cette méthode.
@@ -208,10 +209,14 @@ Deno.serve(async (req) => {
   }
 
   const otp = body.otp?.trim() || null
+  // SasPay pousse la demande sans code préalable : seuls quelques réseaux qu'on
+  // ne sert pas en réclament un, et leur catalogue ne les signale pas.
   const otpRequis =
     processeur === 'pawapay'
       ? methode.pawapay!.authType === 'PREAUTH'
-      : Boolean(methode.sebpay!.otpRequired)
+      : processeur === 'sebpay'
+        ? Boolean(methode.sebpay!.otpRequired)
+        : false
 
   if (otpRequis && !otp) {
     return fail(dire('otpRequis'))
@@ -267,16 +272,23 @@ Deno.serve(async (req) => {
       provider: processeur,
       // L'identifiant réellement envoyé au processeur, pas le slug interne :
       // c'est lui qui permet de retrouver la transaction chez eux.
-      mmo_provider: processeur === 'pawapay' ? methode.pawapay!.provider : methode.sebpay!.code,
+      mmo_provider:
+        processeur === 'pawapay'
+          ? methode.pawapay!.provider
+          : processeur === 'saspay'
+            ? methode.saspay!.code
+            : methode.sebpay!.code,
     })
     .select('id, deposit_id')
     .single()
 
   if (orderError) return fail(dire('commandeImpossible')(orderError.message), 500)
 
-  return processeur === 'pawapay'
-    ? await payerPawapay({ order, methode, amount, currency: priced.currency, numero, otp, langue, item, shop })
-    : await payerSebpay({ order, methode, amount, currency: priced.currency, numero, otp, langue })
+  const ctx = { order, methode, amount, currency: priced.currency, numero, otp, langue }
+
+  if (processeur === 'pawapay') return await payerPawapay({ ...ctx, item, shop })
+  if (processeur === 'saspay') return await payerSaspay({ ...ctx, email, name })
+  return await payerSebpay(ctx)
 })
 
 /**
@@ -403,6 +415,67 @@ async function payerSebpay(ctx: Contexte): Promise<Response> {
     console.error('create-payment: sebpay', e)
     return json({ order_id: order.id, next_step: null })
   }
+}
+
+/**
+ * SasPay demande un prénom et un nom séparés, là où la boutique ne collecte
+ * qu'un nom complet. On coupe au premier espace — et jamais de champ vide, que
+ * l'API refuserait.
+ */
+function couperNom(complet: string): { prenom: string; nom: string } {
+  const morceaux = complet.trim().split(/\s+/)
+  if (morceaux.length < 2) return { prenom: complet.trim() || 'Client', nom: complet.trim() || 'Client' }
+  return { prenom: morceaux[0], nom: morceaux.slice(1).join(' ') }
+}
+
+async function payerSaspay(ctx: Contexte & { email: string; name: string }): Promise<Response> {
+  const { order, methode } = ctx
+  const { prenom, nom } = couperNom(ctx.name)
+
+  let paiement
+  try {
+    paiement = await creerPaiement({
+      // L'identifiant de la commande sert de clé d'idempotence : un retry
+      // réseau ne doit jamais pousser une seconde demande sur le téléphone.
+      reference: order.id,
+      amount: Number(ctx.amount),
+      currency: ctx.currency,
+      country: methode.saspay!.alpha2,
+      network: methode.saspay!.code,
+      phone: ctx.numero,
+      email: ctx.email,
+      prenom,
+      nom,
+      description: 'Achat en ligne',
+    })
+  } catch (e) {
+    if (e instanceof SasPayError && e.status < 500) {
+      // Refus à l'initiation : réseau inactif, numéro invalide, aucun gateway
+      // disponible. L'acheteur peut corriger, il faut le lui dire tout de suite.
+      await marquerEchec(order.id, 'PAYMENT_REJECTED', e.message)
+      console.warn('create-payment: rejet saspay', e.status, e.code, e.message)
+      return json(
+        { error: describeFailure('PAYMENT_REJECTED', ctx.langue), failure_code: 'PAYMENT_REJECTED' },
+        409,
+      )
+    }
+
+    // Comme ailleurs : sans réponse claire, on ne conclut pas.
+    console.error('create-payment: saspay', e)
+    return json({ order_id: order.id, next_step: null })
+  }
+
+  // L'identifiant SasPay est ce qui relie leur webhook à cette commande : leur
+  // enveloppe ne renvoie pas nos métadonnées. Il est donc gardé tout de suite.
+  await admin.from('orders').update({ deposit_id: paiement.id }).eq('id', order.id)
+
+  return json({
+    order_id: order.id,
+    // Rare, mais prévu par leur documentation : certains réseaux retombent sur
+    // un écran d'autorisation au lieu du push direct.
+    next_step: paiement.checkout_url ? 'REDIRECT_TO_AUTH_URL' : null,
+    authorization_url: paiement.checkout_url || null,
+  })
 }
 
 function marquerEchec(orderId: string, code: string, raison: string) {

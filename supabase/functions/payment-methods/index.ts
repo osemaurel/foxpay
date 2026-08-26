@@ -62,7 +62,14 @@ Deno.serve(async (req) => {
     // processeur qui, en réalité, ne traite plus cette méthode.
     const reglage = reglages.get(`${m.country}:${m.method}`)
     const voulu = reglage?.processor ?? null
-    const valide = voulu === 'pawapay' ? Boolean(m.pawapay) : voulu === 'sebpay' ? Boolean(m.sebpay) : false
+    const valide =
+      voulu === 'pawapay'
+        ? Boolean(m.pawapay)
+        : voulu === 'sebpay'
+          ? Boolean(m.sebpay)
+          : voulu === 'saspay'
+            ? Boolean(m.saspay)
+            : false
 
     return {
       country: m.country,
@@ -73,6 +80,7 @@ Deno.serve(async (req) => {
       currency: m.currency,
       pawapay: Boolean(m.pawapay),
       sebpay: Boolean(m.sebpay),
+      saspay: Boolean(m.saspay),
       /** Faux quand le vendeur a retiré cette méthode de sa page de paiement. */
       enabled: reglage?.enabled ?? true,
       /** Le choix enregistré, s'il y en a un. */

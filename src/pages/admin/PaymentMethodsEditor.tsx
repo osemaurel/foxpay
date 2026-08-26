@@ -21,7 +21,7 @@ import { useAdmin } from './AdminLayout'
  * apparaît ou disparaît ici tout seul.
  */
 
-type Processeur = 'pawapay' | 'sebpay'
+type Processeur = 'pawapay' | 'sebpay' | 'saspay'
 
 type Methode = {
   country: string
@@ -32,6 +32,7 @@ type Methode = {
   currency: string
   pawapay: boolean
   sebpay: boolean
+  saspay: boolean
   enabled: boolean
   chosen: Processeur | null
   stored: boolean
@@ -42,7 +43,25 @@ type Methode = {
 /** Ce que le vendeur a réglé pour une méthode, avant enregistrement. */
 type Reglage = { active: boolean; processeur: Processeur | null }
 
-const NOMS: Record<Processeur, string> = { pawapay: 'pawaPay', sebpay: 'SebPay' }
+const NOMS: Record<Processeur, string> = {
+  pawapay: 'pawaPay',
+  sebpay: 'SebPay',
+  saspay: 'SasPay',
+}
+
+/**
+ * Les prestataires capables de traiter cette méthode.
+ *
+ * Le choix n'est offert qu'à partir de deux : en dessous, il n'y a rien à
+ * trancher et un sélecteur à une seule case ne ferait qu'encombrer la ligne.
+ */
+function choix(m: Methode): Processeur[] {
+  const tous: Processeur[] = []
+  if (m.pawapay) tous.push('pawapay')
+  if (m.sebpay) tous.push('sebpay')
+  if (m.saspay) tous.push('saspay')
+  return tous
+}
 
 const cle = (m: Methode) => `${m.country}:${m.method}`
 
@@ -86,7 +105,7 @@ export default function PaymentMethodsEditor() {
     return methodes.some((m) => {
       const r = reglages[cle(m)]
       if (!r) return false
-      return r.active !== m.enabled || (m.pawapay && m.sebpay && r.processeur !== m.chosen)
+      return r.active !== m.enabled || (choix(m).length > 1 && r.processeur !== m.chosen)
     })
   }, [methodes, reglages])
 
@@ -101,18 +120,18 @@ export default function PaymentMethodsEditor() {
     setError(null)
 
     // Une ligne n'est écrite que si elle dit quelque chose : la méthode est
-    // retirée, ou les deux prestataires savent la traiter et il faut trancher.
+    // retirée, ou plusieurs prestataires savent la traiter et il faut trancher.
     // Ailleurs, l'absence de ligne laisse la méthode suivre le catalogue.
     const aGarder = methodes.filter((m) => {
       const r = reglages[cle(m)]
-      return r && (!r.active || (m.pawapay && m.sebpay))
+      return r && (!r.active || choix(m).length > 1)
     })
 
     const lignes = aGarder.map((m) => ({
       shop_id: shop.id,
       country: m.country,
       method: m.method,
-      processor: m.pawapay && m.sebpay ? reglages[cle(m)].processeur : null,
+      processor: choix(m).length > 1 ? reglages[cle(m)].processeur : null,
       enabled: reglages[cle(m)].active,
     }))
 
@@ -232,7 +251,7 @@ function Ligne({
   reglage: Reglage | undefined
   onChange: (patch: Partial<Reglage>) => void
 }) {
-  const double = methode.pawapay && methode.sebpay
+  const possibles = choix(methode)
   const active = reglage?.active ?? true
 
   return (
@@ -270,11 +289,11 @@ function Ligne({
       </label>
 
       {/* Le choix du prestataire n'a de sens que sur une méthode proposée, et
-          seulement quand les deux savent la traiter. */}
+          seulement quand plusieurs savent la traiter. */}
       {active &&
-        (double ? (
+        (possibles.length > 1 ? (
           <div className="flex shrink-0 rounded-lg border border-line bg-card p-0.5">
-            {(['pawapay', 'sebpay'] as Processeur[]).map((p) => (
+            {possibles.map((p) => (
               <button
                 key={p}
                 type="button"
@@ -302,7 +321,7 @@ function depart(methodes: Methode[]): Record<string, Reglage> {
   for (const m of methodes) {
     initial[cle(m)] = {
       active: m.enabled,
-      processeur: m.pawapay && m.sebpay ? m.effective : null,
+      processeur: choix(m).length > 1 ? m.effective : null,
     }
   }
   return initial

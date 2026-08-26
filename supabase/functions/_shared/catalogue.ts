@@ -2,14 +2,20 @@ import { admin } from './admin.ts'
 import type { Langue } from './langue.ts'
 import { getActiveConf, type CountryConf } from './pawapay.ts'
 import { listCountries, listOperators, type SebPayCountry, type SebPayOperator } from './sebpay.ts'
+import {
+  listCountries as listSasCountries,
+  listNetworks as listSasNetworks,
+  type SasPayCountry,
+  type SasPayNetwork,
+} from './saspay.ts'
 
 /**
  * Le catalogue unifié des méthodes de paiement.
  *
- * pawaPay et SebPay décrivent le même monde avec deux vocabulaires : pays en
- * alpha-3 contre alpha-2, opérateur en `MTN_MOMO_CIV` contre `mtn`. Ce module
- * les ramène à une seule liste, où chaque méthode sait lequel des deux — ou les
- * deux — peut la traiter.
+ * Les trois processeurs décrivent le même monde avec trois vocabulaires : pays
+ * en alpha-3 contre alpha-2, opérateur en `MTN_MOMO_CIV`, `mtn` ou `mtn_ci`.
+ * Ce module les ramène à une seule liste, où chaque méthode sait lequel des
+ * trois — ou lesquels — peut la traiter.
  *
  * C'est cette liste que voit l'administration pour router, et la page de
  * paiement pour proposer.
@@ -23,6 +29,7 @@ const ALPHA2_VERS_ALPHA3: Record<string, string> = {
   BJ: 'BEN', BF: 'BFA', CD: 'COD', CG: 'COG', CI: 'CIV', CM: 'CMR',
   GH: 'GHA', GM: 'GMB', GN: 'GIN', GW: 'GNB', KE: 'KEN', ML: 'MLI',
   NE: 'NER', NG: 'NGA', SN: 'SEN', TG: 'TGO', TZ: 'TZA', UG: 'UGA',
+  MW: 'MWI', RW: 'RWA', ZM: 'ZMB',
 }
 
 /** Noms français, quand aucun processeur n'en fournit un présentable. */
@@ -32,6 +39,7 @@ export const NOMS_PAYS: Record<string, string> = {
   GHA: 'Ghana', GIN: 'Guinée', GMB: 'Gambie', GNB: 'Guinée-Bissau',
   KEN: 'Kenya', MLI: 'Mali', NER: 'Niger', NGA: 'Nigéria', SEN: 'Sénégal',
   TGO: 'Togo', TZA: 'Tanzanie', UGA: 'Ouganda',
+  MWI: 'Malawi', RWA: 'Rwanda', ZMB: 'Zambie',
 }
 
 /**
@@ -45,6 +53,7 @@ const NOMS_PAYS_EN: Record<string, string> = {
   GHA: 'Ghana', GIN: 'Guinea', GMB: 'Gambia', GNB: 'Guinea-Bissau',
   KEN: 'Kenya', MLI: 'Mali', NER: 'Niger', NGA: 'Nigeria', SEN: 'Senegal',
   TGO: 'Togo', TZA: 'Tanzania', UGA: 'Uganda',
+  MWI: 'Malawi', RWA: 'Rwanda', ZMB: 'Zambia',
 }
 
 /** Le nom d'un pays dans la langue de l'acheteur, à défaut celui du processeur. */
@@ -54,14 +63,17 @@ export function nomPays(code: string, langue: Langue, defaut: string): string {
 }
 
 /**
- * Ramène l'identifiant d'un opérateur à un slug commun aux deux processeurs.
+ * Ramène l'identifiant d'un opérateur à un slug commun aux trois processeurs.
  *
- * pawaPay suffixe ses codes par le pays (`MTN_MOMO_CIV`) et SebPay non
- * (`mtn`) ; sans cette normalisation, le même opérateur apparaîtrait deux fois
- * dans la liste et ne serait jamais routable.
+ * Chacun nomme le même MTN à sa façon : `MTN_MOMO_CIV` chez pawaPay, `mtn`
+ * chez SebPay, `mtn_ci` chez SasPay. Sans cette normalisation, le même
+ * opérateur apparaîtrait trois fois dans la liste et ne serait jamais routable.
+ *
+ * Le suffixe de pays est retiré dans les deux écritures rencontrées : trois
+ * lettres majuscules (pawaPay) ou deux minuscules (SasPay).
  */
 export function methodeCanonique(code: string): string {
-  const sansPays = code.replace(/_[A-Z]{3}$/, '')
+  const sansPays = code.replace(/_[a-z]{2,3}$/i, '')
   const nu = sansPays.toLowerCase().replace(/[\s_-]+/g, '')
 
   // Les noms composés se ramènent à la marque : c'est elle que l'acheteur
@@ -71,9 +83,13 @@ export function methodeCanonique(code: string): string {
   // pawaPay le nomme VODACOM_MPESA_COD, SebPay le liste deux fois — « mpesa »
   // et « vodacom ». Sans cette ligne, l'acheteur congolais verrait deux entrées
   // pour un seul compte.
+  //
+  // `freemoney` vient de SasPay, qui écrit en toutes lettres ce que pawaPay
+  // abrège en `FREE_SEN` : le même Free Money sénégalais.
   const marques: Record<string, string> = {
     mtnmomo: 'mtn', vodacom: 'vodacom', vodacommpesa: 'vodacom', mpesa: 'vodacom',
     ezypesa: 'ezypesa', halopesa: 'halopesa', tigopesa: 'tigopesa',
+    freemoney: 'free',
   }
   return marques[nu] ?? nu
 }
@@ -105,6 +121,13 @@ export type OptionSebpay = {
   ussdCode: string | null
 }
 
+export type OptionSaspay = {
+  /** Le `code` réseau, seul identifiant accepté par POST /payments/softpay/. */
+  code: string
+  /** SasPay parle en alpha-2 ; on le garde tel quel pour le lui renvoyer. */
+  alpha2: string
+}
+
 export type Methode = {
   /** ISO alpha-3, comme partout ailleurs. */
   country: string
@@ -119,19 +142,23 @@ export type Methode = {
   logo: string | null
   pawapay: OptionPawapay | null
   sebpay: OptionSebpay | null
+  saspay: OptionSaspay | null
 }
 
-export type Processeur = 'pawapay' | 'sebpay'
+export type Processeur = 'pawapay' | 'sebpay' | 'saspay'
 
 /**
  * Le processeur qui traite une méthode, à défaut de choix du vendeur.
  *
- * pawaPay garde la main quand les deux la proposent : c'est lui qui encaisse
+ * pawaPay garde la main quand plusieurs la proposent : c'est lui qui encaisse
  * aujourd'hui, et une intégration ne doit pas changer de main toute seule.
+ * SasPay ferme la marche — il vient d'arriver, et c'est au vendeur de lui
+ * confier une méthode depuis l'administration, pas à ce fichier.
  */
 export function processeurParDefaut(m: Methode): Processeur | null {
   if (m.pawapay) return 'pawapay'
   if (m.sebpay) return 'sebpay'
+  if (m.saspay) return 'saspay'
   return null
 }
 
@@ -176,6 +203,44 @@ async function catalogueSebpay(): Promise<CatalogueSebpay | null> {
 }
 
 // ============================================================
+// Catalogue SasPay, mis en cache
+// ============================================================
+
+type CatalogueSaspay = { pays: SasPayCountry[]; reseaux: SasPayNetwork[] }
+
+/**
+ * Même mise en cache que SebPay, pour une autre raison : SasPay ne facture pas
+ * ses appels, mais il limite à 300 requêtes par minute et sa documentation
+ * demande explicitement de garder en cache les réponses peu volatiles. Deux
+ * appels par visite de la page de paiement épuiseraient ce budget un jour de
+ * forte affluence, sans rien apprendre de nouveau.
+ */
+async function catalogueSaspay(): Promise<CatalogueSaspay | null> {
+  const { data: cache } = await admin
+    .from('processor_catalogue')
+    .select('payload, fetched_at')
+    .eq('processor', 'saspay')
+    .maybeSingle()
+
+  const frais = cache && Date.now() - new Date(cache.fetched_at).getTime() < FRAICHEUR_MS
+  if (frais) return cache.payload as CatalogueSaspay
+
+  try {
+    const [pays, reseaux] = await Promise.all([listSasCountries(), listSasNetworks()])
+    const payload: CatalogueSaspay = { pays, reseaux }
+
+    await admin
+      .from('processor_catalogue')
+      .upsert({ processor: 'saspay', payload, fetched_at: new Date().toISOString() })
+
+    return payload
+  } catch (e) {
+    console.error('catalogue saspay', e)
+    return (cache?.payload as CatalogueSaspay) ?? null
+  }
+}
+
+// ============================================================
 // Fusion
 // ============================================================
 
@@ -197,6 +262,7 @@ function ajouterPawapay(index: Map<string, Methode>, conf: CountryConf[]) {
         logo: p.logo,
         pawapay: null,
         sebpay: null,
+        saspay: null,
       }
 
       // Un opérateur peut exposer plusieurs devises ; on garde la première
@@ -247,6 +313,7 @@ function ajouterSebpay(index: Map<string, Methode>, catalogue: CatalogueSebpay) 
       logo: null,
       pawapay: null,
       sebpay: null,
+      saspay: null,
     }
 
     // Quand deux codes SebPay se ramènent à la même méthode (« mpesa » et
@@ -266,24 +333,70 @@ function ajouterSebpay(index: Map<string, Methode>, catalogue: CatalogueSebpay) 
   }
 }
 
+function ajouterSaspay(index: Map<string, Methode>, catalogue: CatalogueSaspay) {
+  const parAlpha2 = new Map(catalogue.pays.map((p) => [p.code, p]))
+
+  for (const r of catalogue.reseaux) {
+    // Un réseau au catalogue mais routé vers aucun gateway ferait échouer le
+    // paiement au dernier moment, avec un « invalid_method ».
+    if (r.is_active === false) continue
+
+    // Le pays arrive tantôt en objet imbriqué, tantôt en simple identifiant.
+    const paysBrut = r.country as { code?: string; id?: string } | string | null
+    const alpha2 =
+      typeof paysBrut === 'string'
+        ? catalogue.pays.find((p) => p.id === paysBrut)?.code
+        : paysBrut?.code ??
+          catalogue.pays.find((p) => p.id === paysBrut?.id)?.code
+
+    if (!alpha2) continue
+
+    const pays = parAlpha2.get(alpha2)
+    const country = ALPHA2_VERS_ALPHA3[alpha2]
+    if (!pays || !country || !pays.currency) continue
+
+    const method = methodeCanonique(r.code)
+    const cle = `${country}:${method}`
+
+    const methode: Methode = index.get(cle) ?? {
+      country,
+      countryName: NOMS_PAYS[country] ?? pays.name,
+      prefix: String(pays.phone_code ?? '').replace(/^\+/, ''),
+      flag: null,
+      currency: pays.currency,
+      method,
+      name: r.name,
+      logo: null,
+      pawapay: null,
+      sebpay: null,
+      saspay: null,
+    }
+
+    methode.saspay ??= { code: r.code, alpha2 }
+    index.set(cle, methode)
+  }
+}
+
 /**
- * Toutes les méthodes connues des deux processeurs, fusionnées.
+ * Toutes les méthodes connues des trois processeurs, fusionnées.
  *
  * L'échec d'un processeur ne fait pas tomber l'autre : mieux vaut une boutique
  * qui encaisse à moitié qu'une boutique qui n'encaisse plus.
  */
 export async function catalogueUnifie(): Promise<Methode[]> {
-  const [conf, seb] = await Promise.all([
+  const [conf, seb, sas] = await Promise.all([
     getActiveConf().catch((e) => {
       console.error('catalogue pawapay', e)
       return [] as CountryConf[]
     }),
     catalogueSebpay(),
+    catalogueSaspay(),
   ])
 
   const index = new Map<string, Methode>()
   ajouterPawapay(index, conf)
   if (seb) ajouterSebpay(index, seb)
+  if (sas) ajouterSaspay(index, sas)
 
   return [...index.values()].sort(
     (a, b) => a.countryName.localeCompare(b.countryName, 'fr') || a.name.localeCompare(b.name, 'fr'),
@@ -331,7 +444,9 @@ export async function resolveurDeMethodes(shopId: string) {
         ? 'pawapay'
         : voulu === 'sebpay' && m.sebpay
           ? 'sebpay'
-          : processeurParDefaut(m)
+          : voulu === 'saspay' && m.saspay
+            ? 'saspay'
+            : processeurParDefaut(m)
 
     return { processeur, active: reglage?.enabled ?? true }
   }
