@@ -79,6 +79,28 @@ async function appel<T>(chemin: string, init: RequestInit = {}, idempotence?: st
   return (corps.data ?? (corps as unknown)) as T
 }
 
+/**
+ * Met une erreur de validation à plat, si profonde soit-elle.
+ *
+ * Leurs erreurs de validation sont imbriquées quand le champ l'est :
+ * `{"customer": {"email": ["Saisissez une adresse valide."]}}`. Une version
+ * précédente n'aplatissait qu'un niveau et affichait « customer :
+ * [object Object] » — le message utile était perdu, et trois paiements ont
+ * échoué sans qu'on sache pourquoi jusqu'à ce qu'on aille lire les commandes.
+ */
+function aplatir(valeur: unknown, chemin = ''): string[] {
+  if (Array.isArray(valeur)) return valeur.flatMap((v) => aplatir(v, chemin))
+
+  if (valeur && typeof valeur === 'object') {
+    return Object.entries(valeur as Record<string, unknown>).flatMap(([cle, v]) =>
+      aplatir(v, chemin ? `${chemin}.${cle}` : cle),
+    )
+  }
+
+  const texte = String(valeur)
+  return texte ? [chemin ? `${chemin} : ${texte}` : texte] : []
+}
+
 function lireErreur(
   erreur: unknown,
   message: string | undefined,
@@ -91,11 +113,7 @@ function lireErreur(
       return { code: typeof objet.code === 'string' ? objet.code : null, message: objet.message }
     }
 
-    // Erreur de validation : { champ: ["message"], … }
-    const details = Object.entries(objet)
-      .map(([champ, messages]) => `${champ} : ${[messages].flat().join(', ')}`)
-      .join(' — ')
-
+    const details = aplatir(objet).join(' — ')
     if (details) return { code: 'validation_error', message: details }
   }
 

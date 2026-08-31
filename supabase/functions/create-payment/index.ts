@@ -106,7 +106,10 @@ type Product = {
   currency: string
 }
 
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+// L'extension fait au moins deux lettres : il n'en existe aucune d'une seule,
+// et une adresse comme « mau@t.v » passait notre contrôle pour se faire refuser
+// par le processeur, après la création de la commande.
+const EMAIL = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)*\.[A-Za-z]{2,}$/
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -450,14 +453,17 @@ async function payerSaspay(ctx: Contexte & { email: string; name: string }): Pro
     })
   } catch (e) {
     if (e instanceof SasPayError && e.status < 500) {
-      // Refus à l'initiation : réseau inactif, numéro invalide, aucun gateway
-      // disponible. L'acheteur peut corriger, il faut le lui dire tout de suite.
-      await marquerEchec(order.id, 'PAYMENT_REJECTED', e.message)
+      // Refus à l'initiation. Deux familles bien distinctes : ce que l'acheteur
+      // a saisi et peut corriger — son email, son numéro —, et ce qui ne dépend
+      // pas de lui, réseau inactif ou aucun gateway disponible. Les confondre
+      // sous « l'opérateur a refusé » enverrait quelqu'un réessayer en boucle
+      // avec la même adresse invalide.
+      const saisie = e.code === 'validation_error' || e.code === 'invalid_customer'
+      const code = saisie ? 'INVALID_CUSTOMER' : 'PAYMENT_REJECTED'
+
+      await marquerEchec(order.id, code, e.message)
       console.warn('create-payment: rejet saspay', e.status, e.code, e.message)
-      return json(
-        { error: describeFailure('PAYMENT_REJECTED', ctx.langue), failure_code: 'PAYMENT_REJECTED' },
-        409,
-      )
+      return json({ error: describeFailure(code, ctx.langue), failure_code: code }, 409)
     }
 
     // Comme ailleurs : sans réponse claire, on ne conclut pas.

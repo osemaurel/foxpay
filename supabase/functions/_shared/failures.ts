@@ -69,6 +69,10 @@ const MESSAGES: Record<string, Record<Langue, string>> = {
     fr: "L'opérateur a refusé le paiement. Vérifie ton numéro et ton solde, puis réessaie.",
     en: 'The provider declined the payment. Check your number and your balance, then try again.',
   },
+  INVALID_CUSTOMER: {
+    fr: "Ton adresse email n'est pas acceptée par l'opérateur de paiement. Vérifie-la — c'est aussi là que ton fichier sera envoyé.",
+    en: 'Your email address was rejected by the payment provider. Check it — that is also where your file will be sent.',
+  },
   NOT_FOUND: {
     fr: "La demande de paiement n'est jamais partie. Rien n'a été débité — tu peux recommencer.",
     en: 'The payment request never went out. Nothing was charged — you can start over.',
