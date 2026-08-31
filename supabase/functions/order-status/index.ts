@@ -26,7 +26,10 @@ Deno.serve(async (req) => {
 
   const { data: order } = await admin
     .from('orders')
-    .select('id, status, download_token, failure_code, authorization_url, locale')
+    .select(
+      'id, status, download_token, failure_code, authorization_url, locale, ' +
+        'buyer_email, products(title)',
+    )
     .eq('id', body.order_id)
     .maybeSingle()
 
@@ -51,9 +54,16 @@ Deno.serve(async (req) => {
     }
   }
 
+  const product = order.products as { title: string } | null
+
   return json({
     status,
     download_url: status === 'paid' ? downloadUrl(order.download_token, langue) : null,
+    // De quoi écrire une vraie page de confirmation : à quelle adresse le lien
+    // a été envoyé, et ce qui a été acheté. L'identifiant de commande est déjà
+    // ce qui donne accès au fichier — le renvoyer n'ouvre rien de plus.
+    buyer_email: status === 'paid' ? order.buyer_email : null,
+    product_title: product?.title ?? null,
     // Les opérateurs à autorisation par redirection (Wave) fournissent cette
     // URL quelques secondes après l'initiation. C'est le seul cas où l'acheteur
     // doit quitter la page — c'est le fonctionnement imposé par l'opérateur.

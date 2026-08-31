@@ -215,6 +215,53 @@ const TEXTES = {
   },
   telechargerMaintenant: { fr: 'Télécharger maintenant', en: 'Download now' },
 
+  // --- Page de confirmation ---
+  merciTitre: { fr: 'Paiement réussi', en: 'Payment successful' },
+  merciSousTitre: {
+    fr: (titre: string) => `« ${titre} » est à toi. Télécharge-le maintenant.`,
+    en: (titre: string) => `“${titre}” is yours. Download it now.`,
+  },
+  merciEnvoye: {
+    fr: (email: string) =>
+      `Le lien a aussi été envoyé à ${email}. Il reste valable 7 jours.`,
+    en: (email: string) =>
+      `The link was also sent to ${email}. It stays valid for 7 days.`,
+  },
+  merciEnvoyeSansEmail: {
+    fr: 'Le lien a aussi été envoyé par email. Il reste valable 7 jours.',
+    en: 'The link was also sent by email. It stays valid for 7 days.',
+  },
+  merciEnregistre: {
+    fr: 'Enregistre le fichier sur ton appareil dès qu’il s’ouvre.',
+    en: 'Save the file to your device as soon as it opens.',
+  },
+  merciPasRecu: { fr: "Tu n'as pas reçu l'email ?", en: "Didn't get the email?" },
+  merciSpamIntro: {
+    fr: 'Neuf fois sur dix, il est arrivé mais il est rangé ailleurs. Cherche-le :',
+    en: 'Nine times out of ten it arrived but got filed elsewhere. Look for it:',
+  },
+  merciSpamGmail: {
+    fr: 'Gmail : ouvre le menu à gauche, descends jusqu’à « Spam », puis regarde aussi dans l’onglet « Promotions ».',
+    en: 'Gmail: open the left menu, scroll down to “Spam”, then also check the “Promotions” tab.',
+  },
+  merciSpamAutres: {
+    fr: 'Yahoo, Outlook, Hotmail : le dossier s’appelle « Courrier indésirable ».',
+    en: 'Yahoo, Outlook, Hotmail: the folder is called “Junk”.',
+  },
+  merciSpamRecherche: {
+    fr: (nom: string) => `Ou cherche « ${nom} » dans la barre de recherche de ta boîte mail.`,
+    en: (nom: string) => `Or search for “${nom}” in your mailbox search bar.`,
+  },
+  merciAide: {
+    fr: (email: string) => `Toujours rien ? Écris à ${email}, on te renvoie le fichier.`,
+    en: (email: string) => `Still nothing? Write to ${email} and we'll resend the file.`,
+  },
+  merciVerification: { fr: 'Vérification du paiement…', en: 'Checking your payment…' },
+  merciIntrouvable: {
+    fr: "Cette commande n'existe pas.",
+    en: "This order doesn't exist.",
+  },
+
   // --- Récapitulatif ---
   taCommande: { fr: 'Ta commande', en: 'Your order' },
   leProduit: { fr: 'Le produit', en: 'The product' },

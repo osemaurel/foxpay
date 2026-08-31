@@ -6,6 +6,7 @@ import ShopLayout from './pages/shop/ShopLayout'
 import ShopHome from './pages/shop/ShopHome'
 import ShopProductPage from './pages/shop/ProductPage'
 import ShopCheckout from './pages/shop/Checkout'
+import ShopMerci from './pages/shop/Merci'
 import Login from './pages/Login'
 import ScrollToTop from './components/ScrollToTop'
 import AdminLayout from './pages/admin/AdminLayout'
@@ -54,6 +55,21 @@ const SCREENS = [
             <Route path="ventes" element={<SalesPage />} />
             <Route path="retraits" element={<Retraits />} />
             <Route path="parametres" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    ),
+  },
+  {
+    id: 'merci',
+    label: 'Confirmation',
+    note: 'Où atterrit l’acheteur dès que son paiement aboutit : le bouton de téléchargement, et où chercher l’email s’il ne le voit pas.',
+    render: () => (
+      <MemoryRouter initialEntries={['/boutique/atelier-kodi/merci?order=demo-merci']}>
+        <ScrollToTop />
+        <Routes>
+          <Route path="/boutique/:slug" element={<ShopLayout />}>
+            <Route path="merci" element={<ShopMerci />} />
           </Route>
         </Routes>
       </MemoryRouter>

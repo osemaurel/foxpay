@@ -431,9 +431,27 @@ export async function callFunction<T>(name: string, body?: unknown): Promise<T> 
 
   if (name === 'order-status') {
     attentes += 1
-    return attentes < 3
-      ? ({ status: 'pending', download_url: null, authorization_url: null, message: null } as T)
-      : ({ status: 'paid', download_url: '#', authorization_url: null, message: null } as T)
+    const enAttente = {
+      status: 'pending',
+      download_url: null,
+      authorization_url: null,
+      buyer_email: null,
+      product_title: products[0].title,
+      message: null,
+    }
+    const payee = {
+      status: 'paid',
+      download_url: '#',
+      authorization_url: null,
+      buyer_email: 'aminata.kone@gmail.com',
+      product_title: products[0].title,
+      message: null,
+    }
+    // La page de confirmation se charge seule : elle doit voir « payé » du
+    // premier coup, alors que le tunnel doit d'abord montrer l'attente.
+    const params = (body ?? {}) as { order_id?: string }
+    if (params.order_id === 'demo-merci') return payee as T
+    return (attentes < 3 ? enAttente : payee) as T
   }
 
   throw new Error(`Aperçu : la fonction « ${name} » n'est pas branchée.`)

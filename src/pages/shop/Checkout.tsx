@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { callFunction } from '../../lib/supabase'
 import type { Product } from '../../lib/types'
 import { formatCharged, formatPrice } from '../../lib/format'
@@ -82,7 +82,8 @@ function goToAuth(orderId: string, url: string): boolean {
 }
 
 export default function Checkout() {
-  const { productSlug } = useParams<{ productSlug: string }>()
+  const { slug, productSlug } = useParams<{ slug: string; productSlug: string }>()
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const { shop, products } = useShop()
   const { langue, t } = useLangue()
@@ -231,6 +232,10 @@ export default function Checkout() {
       if (reply.status === 'paid') {
         setDownloadUrl(reply.download_url)
         setStage('paid')
+        // Une vraie page, à sa propre adresse. Rester ici obligeait l'acheteur
+        // à remarquer qu'une carte avait changé au milieu de l'écran — beaucoup
+        // ne le voyaient pas, et repartaient persuadés d'avoir payé pour rien.
+        navigate(`/boutique/${slug}/merci?order=${orderId}`, { replace: true })
         // Le montant compté est celui réellement débité, dans la devise de
         // l'acheteur. Après un rechargement de page le pays n'est plus
         // sélectionné : on retombe alors sur le prix du produit.
