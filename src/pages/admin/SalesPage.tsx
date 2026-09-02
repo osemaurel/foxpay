@@ -3,7 +3,7 @@ import { callFunctionAuth, supabase } from '../../lib/supabase'
 import type { Order, Product } from '../../lib/types'
 import { formatCharged, formatDate, formatPrice } from '../../lib/format'
 import { countryName, providerName } from '../../lib/mmo'
-import { Card, Eyebrow, Spinner } from '../../components/ui'
+import { Card, Eyebrow, Spinner, inputClass } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
 const STATUS: Record<Order['status'], { text: string; className: string }> = {
@@ -47,10 +47,27 @@ const FILTERS = [
   { id: 'failed', label: 'Échouées' },
 ] as const
 
+/**
+ * Met un texte à plat pour le comparer : sans accent, sans casse, sans espaces
+ * en trop.
+ *
+ * Sans ça, chercher « kouame » ne trouverait pas « Kouamé », et la moitié des
+ * noms de la clientèle deviendrait introuvable à qui ne compose pas les accents
+ * sur son clavier.
+ */
+function normaliser(texte: string): string {
+  return texte
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim()
+}
+
 export default function SalesPage() {
   const { shop, products } = useAdmin()
   const [orders, setOrders] = useState<Order[] | null>(null)
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['id']>('all')
+  const [recherche, setRecherche] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -66,12 +83,22 @@ export default function SalesPage() {
 
   const paid = orders.filter((o) => o.status === 'paid')
   const total = paid.reduce((sum, o) => sum + o.amount, 0)
-  const shown =
+  const parStatut =
     filter === 'all'
       ? orders
       : orders.filter((o) =>
           filter === 'failed' ? o.status !== 'paid' && o.status !== 'pending' : o.status === filter,
         )
+
+  // Le nom d'abord, puisque c'est ce que le vendeur retient d'un client qui
+  // écrit. L'email suit : c'est ce qui est affiché à côté dans le tableau, et
+  // souvent la seule chose que l'acheteur a laissée.
+  const cherche = normaliser(recherche)
+  const shown = cherche
+    ? parStatut.filter((o) =>
+        normaliser(`${o.buyer_name ?? ''} ${o.buyer_email}`).includes(cherche),
+      )
+    : parStatut
 
   const open = orders.find((o) => o.id === openId) ?? null
 
@@ -97,6 +124,19 @@ export default function SalesPage() {
       </Card>
 
       <Card title="Commandes">
+        {orders.length > 0 && (
+          <div className="mb-3">
+            <input
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Rechercher un client par son nom ou son email"
+              aria-label="Rechercher un client"
+              className={`${inputClass} text-sm sm:max-w-sm`}
+            />
+          </div>
+        )}
+
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1">
             {FILTERS.map((f) => (
@@ -121,12 +161,20 @@ export default function SalesPage() {
           <p className="text-sm text-ink-faint">
             {orders.length === 0
               ? "Aucune commande pour l'instant. Elles apparaîtront ici dès le premier achat."
-              : 'Aucune commande dans cette catégorie.'}
+              : cherche
+                ? `Aucun client ne correspond à « ${recherche.trim()} »${
+                    filter === 'all' ? '' : ' dans cette catégorie'
+                  }.`
+                : 'Aucune commande dans cette catégorie.'}
           </p>
         ) : (
           <>
             <p className="mb-3 text-xs text-ink-faint">
-              Clique sur une ligne pour voir le détail de la commande.
+              {cherche
+                ? `${shown.length} commande${shown.length > 1 ? 's' : ''} trouvée${
+                    shown.length > 1 ? 's' : ''
+                  }. Clique sur une ligne pour voir le détail.`
+                : 'Clique sur une ligne pour voir le détail de la commande.'}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
