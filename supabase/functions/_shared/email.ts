@@ -356,6 +356,88 @@ padding:14px;border-radius:8px;text-decoration:none;font-weight:600">${RELANCE.b
 }
 
 // ============================================================
+// L'acheteur, le lendemain : la demande d'avis
+// ============================================================
+
+/**
+ * Un courrier, une fois, la veille du jour où l'on n'y pensera plus.
+ *
+ * Il porte deux choses, et l'ordre compte. D'abord la question — ce qu'il a
+ * pensé du produit —, parce que c'est ce qu'on lui demande. Ensuite un numéro
+ * WhatsApp, parce que quelqu'un dont le fichier est illisible n'a que faire
+ * d'un formulaire à étoiles : il veut joindre une personne. Fondre les deux
+ * dans le même bouton reviendrait à recevoir des réclamations notées 1 sur 5
+ * au lieu de les régler.
+ *
+ * Il n'est envoyé qu'à ceux qui ont ouvert leur fichier. Demander son avis à
+ * quelqu'un qui n'a rien pu télécharger, c'est ajouter l'ironie au préjudice —
+ * ceux-là reçoivent les rappels, qui sont faits pour eux.
+ */
+const AVIS = {
+  sujet: {
+    fr: (titre: string) => `Ton avis sur ${titre} ?`,
+    en: (titre: string) => `What did you think of ${titre}?`,
+  },
+  titre: { fr: 'Ça t’a plu ?', en: 'How was it?' },
+  intro: {
+    fr: (titre: string) =>
+      `Tu as téléchargé <strong>${titre}</strong> hier. En une minute, dis-nous ce que tu en as pensé — ça nous aide à améliorer ce qu'on propose.`,
+    en: (titre: string) =>
+      `You downloaded <strong>${titre}</strong> yesterday. Tell us what you thought in under a minute — it helps us make better products.`,
+  },
+  bouton: { fr: 'Donner mon avis', en: 'Leave my feedback' },
+  prive: {
+    fr: 'Ton avis est lu par la boutique et n’est publié nulle part.',
+    en: 'Your feedback goes to the shop and is never published anywhere.',
+  },
+  souci: {
+    fr: 'Un problème avec ton fichier ? N’attends pas : écris sur WhatsApp, on te répond.',
+    en: 'A problem with your file? Don’t wait — message us on WhatsApp and we’ll answer.',
+  },
+  whatsapp: { fr: 'Écrire sur WhatsApp', en: 'Message us on WhatsApp' },
+} as const
+
+export type DemandeAvis = {
+  to: string
+  shopName: string
+  productTitle: string
+  /** La page où déposer l'avis, identifiant de commande compris. */
+  avisUrl: string
+  /** Le lien wa.me, déjà construit. Absent si aucun numéro n'est configuré. */
+  whatsappUrl: string | null
+  contactEmail: string | null
+  langue: Langue
+}
+
+export function sendReviewRequestEmail(d: DemandeAvis): Promise<void> {
+  return envoyer({
+    to: d.to,
+    replyTo: d.contactEmail,
+    subject: AVIS.sujet[d.langue](d.productTitle),
+    html: page(
+      `
+<h1 style="margin:0 0 16px;font-size:20px">${AVIS.titre[d.langue]}</h1>
+<p style="color:#475569;line-height:1.6;margin:0 0 24px">
+${AVIS.intro[d.langue](escapeHtml(d.productTitle))}</p>
+<a href="${d.avisUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
+padding:14px;border-radius:8px;text-decoration:none;font-weight:600">${AVIS.bouton[d.langue]}</a>
+<p style="color:#64748b;font-size:14px;line-height:1.6;margin:16px 0 0">${AVIS.prive[d.langue]}</p>
+${
+  d.whatsappUrl
+    ? `<div style="margin:28px 0 0;padding:20px 0 0;border-top:1px solid #e2e8f0">
+<p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px">${AVIS.souci[d.langue]}</p>
+<a href="${d.whatsappUrl}" style="display:block;background:#25d366;color:#0b3d20;text-align:center;
+padding:13px;border-radius:8px;text-decoration:none;font-weight:600">${AVIS.whatsapp[d.langue]}</a>
+</div>`
+    : ''
+}
+<p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(d.shopName)}</p>`,
+      d.langue,
+    ),
+  })
+}
+
+// ============================================================
 // Habillage commun
 // ============================================================
 

@@ -262,6 +262,48 @@ const TEXTES = {
     en: "This order doesn't exist.",
   },
 
+  // --- Avis de l'acheteur ---
+  monAvisTitre: { fr: 'Ton avis', en: 'Your feedback' },
+  avisSousTitre: {
+    fr: (titre: string) => `Qu'as-tu pensé de ${titre} ?`,
+    en: (titre: string) => `What did you think of ${titre}?`,
+  },
+  avisNote: { fr: 'Ta note', en: 'Your rating' },
+  avisEtoiles: {
+    fr: (n: number) => `${n} étoile${n > 1 ? 's' : ''} sur 5`,
+    en: (n: number) => `${n} star${n > 1 ? 's' : ''} out of 5`,
+  },
+  avisCommentaire: { fr: 'Ton commentaire (facultatif)', en: 'Your comment (optional)' },
+  avisCommentairePlace: {
+    fr: 'Ce qui t’a plu, ce qui manquait…',
+    en: 'What you liked, what was missing…',
+  },
+  avisEnvoyer: { fr: 'Envoyer mon avis', en: 'Send my feedback' },
+  avisEnvoi: { fr: 'Envoi…', en: 'Sending…' },
+  avisPrive: {
+    fr: 'Ton avis est lu par la boutique et n’est publié nulle part.',
+    en: 'Your feedback goes to the shop and is never published anywhere.',
+  },
+  avisMerciTitre: { fr: 'Merci !', en: 'Thank you!' },
+  avisMerciTexte: {
+    fr: 'Ton avis est bien arrivé. Il aide à améliorer ce qui est proposé ici.',
+    en: 'Your feedback came through. It helps make what we offer better.',
+  },
+  avisEchec: {
+    fr: "Ton avis n'a pas pu être envoyé. Réessaie dans un instant.",
+    en: "Your feedback couldn't be sent. Try again in a moment.",
+  },
+  avisIntrouvable: {
+    fr: "Ce lien n'est plus valable.",
+    en: 'This link is no longer valid.',
+  },
+  avisProblemeTitre: { fr: 'Un problème avec ton fichier ?', en: 'A problem with your file?' },
+  avisProblemeTexte: {
+    fr: 'N’attends pas : écris-nous sur WhatsApp, une vraie personne te répond.',
+    en: 'Don’t wait — message us on WhatsApp and a real person will answer.',
+  },
+  avisWhatsapp: { fr: 'Écrire sur WhatsApp', en: 'Message us on WhatsApp' },
+
   // --- Récapitulatif ---
   taCommande: { fr: 'Ta commande', en: 'Your order' },
   leProduit: { fr: 'Le produit', en: 'The product' },

@@ -12,6 +12,7 @@ import ShopHome from './pages/shop/ShopHome'
 import ProductPage from './pages/shop/ProductPage'
 import Checkout from './pages/shop/Checkout'
 import Merci from './pages/shop/Merci'
+import Avis from './pages/shop/Avis'
 import AdminLayout from './pages/admin/AdminLayout'
 import Home from './pages/admin/Home'
 import ProductsList from './pages/admin/ProductsList'
@@ -19,6 +20,7 @@ import ProductEdit from './pages/admin/ProductEdit'
 import SalesPage from './pages/admin/SalesPage'
 import SettingsPage from './pages/admin/SettingsPage'
 import Retraits from './pages/admin/Retraits'
+import AvisClients from './pages/admin/AvisClients'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -46,6 +48,7 @@ export default function App() {
           <Route path="p/:productSlug" element={<ProductPage />} />
           <Route path="checkout/:productSlug" element={<Checkout />} />
           <Route path="merci" element={<Merci />} />
+          <Route path="avis" element={<Avis />} />
         </Route>
 
         {/* Où atterrit un lien de téléchargement refusé. */}
@@ -64,6 +67,7 @@ export default function App() {
           <Route path="produits/:productId" element={<ProductEdit />} />
           <Route path="ventes" element={<SalesPage />} />
           <Route path="retraits" element={<Retraits />} />
+          <Route path="avis" element={<AvisClients />} />
           <Route path="parametres" element={<SettingsPage />} />
         </Route>
 
