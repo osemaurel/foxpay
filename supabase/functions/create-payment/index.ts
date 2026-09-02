@@ -444,16 +444,18 @@ function couperNom(complet: string): { prenom: string; nom: string } {
  * Le rapprochement reste possible par le téléphone, qui est le vrai
  * identifiant, et par `metadata.order_id` qu'on envoie déjà.
  *
- * Sans le secret — ou avec un secret mal formé —, on continue d'envoyer
- * l'adresse de l'acheteur : la boutique ne doit pas dépendre d'une
- * configuration pour encaisser. Le contrôle de forme n'est pas de la
- * prudence gratuite : SasPay refuserait une adresse invalide par un
- * `validation_error`, que nous traduisons en « corrige ton email » — et
- * l'acheteur passerait sa journée à corriger le sien, qui n'y est pour rien.
+ * Le secret `SASPAY_CUSTOMER_EMAIL` permet d'en changer sans redéployer.
+ *
+ * Si l'adresse retenue est mal formée, on retombe sur celle de l'acheteur :
+ * SasPay refuserait une adresse invalide par un `validation_error`, que nous
+ * traduisons en « corrige ton email » — et l'acheteur passerait sa journée à
+ * corriger le sien, qui n'y est pour rien. Encaisser prime sur la discrétion.
  */
+const EMAIL_SASPAY = 'my2023projects@gmail.com'
+
 function emailDeclare(acheteur: string): string {
-  const substitut = Deno.env.get('SASPAY_CUSTOMER_EMAIL')?.trim()
-  return substitut && EMAIL.test(substitut) ? substitut : acheteur
+  const declaree = Deno.env.get('SASPAY_CUSTOMER_EMAIL')?.trim() || EMAIL_SASPAY
+  return EMAIL.test(declaree) ? declaree : acheteur
 }
 
 async function payerSaspay(ctx: Contexte & { email: string; name: string }): Promise<Response> {
