@@ -138,6 +138,15 @@ Deno.serve(async (req) => {
       name: nomPays(code, langue, premier.countryName),
       prefix: premier.prefix,
       flag: methodes.find((m) => m.flag)?.flag ?? null,
+      // La vérification du numéro pendant la frappe passe par pawaPay, seul
+      // des trois à savoir dire à qui appartient un numéro. Là où il n'opère
+      // pas, il répond « inconnu » pour un numéro parfaitement correct — et la
+      // page affichait « Ce numéro ne semble pas valide » à des acheteurs qui
+      // n'avaient rien fait de mal. Certains ajoutaient alors l'indicatif déjà
+      // présent, et le paiement partait avec un numéro à rallonge.
+      //
+      // On dit donc ici, pays par pays, si l'on est en mesure de juger.
+      phone_check: methodes.some((m) => m.pawapay),
       currency: priced.currency,
       base_amount: formatAmount(base.amount, 'NONE'),
       fee_amount: formatAmount(priced.amount - base.amount, 'NONE'),

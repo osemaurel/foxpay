@@ -32,6 +32,11 @@ type CountryOption = {
   name: string
   prefix: string
   flag: string | null
+  /**
+   * Vrai quand on sait vérifier un numéro de ce pays. Faux ailleurs : mieux
+   * vaut ne rien dire que de déclarer faux un numéro correct.
+   */
+  phone_check: boolean
   currency: string
   /** Le prix seul, sans les frais de paiement. */
   base_amount: string
@@ -160,7 +165,9 @@ export default function Checkout() {
   // Vérification du numéro pendant la frappe : l'acheteur découvre sa faute de
   // frappe tout de suite, et l'opérateur deviné lui évite un choix de plus.
   useEffect(() => {
-    if (!country || localNumber.length < 6) {
+    // Hors des pays que pawaPay couvre, la vérification répond « inconnu »
+    // pour n'importe quel numéro : on ne la sollicite pas, et on ne juge pas.
+    if (!country || !country.phone_check || localNumber.length < 6) {
       setPhoneState('idle')
       return
     }
