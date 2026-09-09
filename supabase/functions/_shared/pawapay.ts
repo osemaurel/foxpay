@@ -61,6 +61,9 @@ export const EXTRA_CURRENCY_COUNTRIES: Record<string, string[]> = {
   USD: ['COD'],
   NGN: ['NGA'],
   GHS: ['GHA'],
+  // La Guinée, à ne pas confondre avec la Guinée-Bissau juste au-dessus : la
+  // seconde est en zone CFA, la première a son propre franc.
+  GNF: ['GIN'],
 }
 
 /**

@@ -43,6 +43,18 @@ const PAYS = [
     defaultRate: 0.0195,
     hint: 'Combien de cedis pour 1 FCFA.',
   },
+  {
+    code: 'GNF',
+    pays: 'Guinée',
+    label: 'Franc guinéen (GNF)',
+    decimals: 0,
+    // Un produit à 15 000 FCFA fait plus de 230 000 francs guinéens : arrondir
+    // au millier évite d'afficher un montant au franc près, qui a l'air d'une
+    // erreur de calcul sur une page de paiement.
+    roundTo: 1000,
+    defaultRate: 15.56,
+    hint: 'Combien de francs guinéens pour 1 FCFA.',
+  },
 ] as const
 
 type Code = (typeof PAYS)[number]['code']
