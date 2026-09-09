@@ -265,7 +265,19 @@ export async function settleSaspayWebhook(
     await deliver(order)
     return done('paid')
   }
-  if (order.status !== 'pending') return done('failed', { failureCode: order.failure_code })
+
+  if (order.status !== 'pending') {
+    // Le balayage classe en échec les demandes que SasPay laisse en attente
+    // trois heures durant. Rien ne lui interdit pour autant de confirmer plus
+    // tard : un succès annoncé après coup rouvre donc le dossier, sans quoi on
+    // garderait l'argent d'un acheteur sans jamais lui livrer son fichier.
+    if (lireStatut(statut) !== 'paid') {
+      return done('failed', { failureCode: order.failure_code })
+    }
+
+    await admin.from('orders').update({ status: 'pending' }).eq('id', order.id)
+    order.status = 'pending'
+  }
 
   return await conclureSaspay(order, statut, null)
 }
