@@ -68,6 +68,13 @@ type StatusReply = {
 const POLL_MS = 3000
 /** Au-delà, l'invite de code PIN a expiré chez tous les opérateurs. */
 const POLL_DEADLINE_MS = 5 * 60 * 1000
+/**
+ * Bien plus long quand l'acheteur est parti sur l'écran d'un opérateur (Wave).
+ * Là-bas il ouvre une application, se connecte, confirme : cinq minutes ne
+ * suffisent pas, et abandonner le suivi pendant qu'il paie était le plus sûr
+ * moyen de lui faire croire que rien n'avait marché.
+ */
+const REDIRECT_DEADLINE_MS = 20 * 60 * 1000
 
 /**
  * Envoie l'acheteur sur l'écran d'autorisation de l'opérateur (Wave), une seule
@@ -77,8 +84,22 @@ const POLL_DEADLINE_MS = 5 * 60 * 1000
  *
  * Renvoie vrai quand la redirection est lancée.
  */
+function cleAuth(orderId: string): string {
+  return `foxpay:auth:${orderId}`
+}
+
+/** Cette commande est-elle déjà partie chez un opérateur à redirection ? */
+function dejaRedirige(orderId: string | null): boolean {
+  if (!orderId) return false
+  try {
+    return sessionStorage.getItem(cleAuth(orderId)) !== null
+  } catch {
+    return false
+  }
+}
+
 function goToAuth(orderId: string, url: string): boolean {
-  const cle = `foxpay:auth:${orderId}`
+  const cle = cleAuth(orderId)
   if (sessionStorage.getItem(cle)) return false
 
   sessionStorage.setItem(cle, '1')
@@ -117,6 +138,12 @@ export default function Checkout() {
   const [error, setError] = useState<string | null>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [timedOut, setTimedOut] = useState(false)
+  /**
+   * L'écran d'autorisation de l'opérateur, gardé pour celui qui revient sans
+   * avoir payé. Sans lui, un acheteur qui a fermé l'onglet Wave par erreur
+   * n'avait plus aucun moyen d'y retourner.
+   */
+  const [authUrl, setAuthUrl] = useState<string | null>(null)
 
   const country = countries?.find((c) => c.country === countryCode) ?? null
   const provider = country?.providers.find((p) => p.provider === providerCode) ?? null
@@ -234,6 +261,7 @@ export default function Checkout() {
       const reply = await poll(orderId!)
       if (cancelled || !reply) return schedule()
 
+      if (reply.authorization_url) setAuthUrl(reply.authorization_url)
       if (reply.authorization_url && goToAuth(orderId!, reply.authorization_url)) return
 
       if (reply.status === 'paid') {
@@ -264,7 +292,8 @@ export default function Checkout() {
 
     function schedule() {
       if (cancelled) return
-      if (Date.now() - startedAt.current > POLL_DEADLINE_MS) {
+      const limite = dejaRedirige(orderId) ? REDIRECT_DEADLINE_MS : POLL_DEADLINE_MS
+      if (Date.now() - startedAt.current > limite) {
         setTimedOut(true)
         return
       }
@@ -327,11 +356,24 @@ export default function Checkout() {
       setTimedOut(false)
       setStage('waiting')
 
-      if (authorization_url) goToAuth(order_id, authorization_url)
+      if (authorization_url) {
+        setAuthUrl(authorization_url)
+        goToAuth(order_id, authorization_url)
+      }
     } catch (e) {
       setError((e as Error).message)
     }
     setBusy(false)
+  }
+
+  /**
+   * « J'ai déjà payé » : on ne redemande rien à l'acheteur, on se remet
+   * simplement à interroger le serveur. Celui qui revient de Wave a payé il y
+   * a une minute et veut une réponse, pas un formulaire à remplir de nouveau.
+   */
+  function verifierMaintenant() {
+    startedAt.current = Date.now()
+    setTimedOut(false)
   }
 
   function retry() {
@@ -361,7 +403,14 @@ export default function Checkout() {
           {stage === 'paid' && <Paid product={product} downloadUrl={downloadUrl} email={email} />}
 
           {stage === 'waiting' && (
-            <Waiting provider={provider} timedOut={timedOut} onRetry={retry} />
+            <Waiting
+              provider={provider}
+              timedOut={timedOut}
+              onRetry={retry}
+              redirige={dejaRedirige(orderId)}
+              authUrl={authUrl}
+              onVerifier={verifierMaintenant}
+            />
           )}
 
           {stage === 'failed' && (
@@ -599,10 +648,17 @@ function Waiting({
   provider,
   timedOut,
   onRetry,
+  redirige,
+  authUrl,
+  onVerifier,
 }: {
   provider: ProviderOption | null
   timedOut: boolean
   onRetry: () => void
+  /** L'acheteur est parti sur l'écran d'un opérateur (Wave) et en revient. */
+  redirige: boolean
+  authUrl: string | null
+  onVerifier: () => void
 }) {
   const { t } = useLangue()
   const manual = provider?.pin_prompt === 'MANUAL'
@@ -610,6 +666,30 @@ function Waiting({
   return (
     <section className="space-y-5 rounded-2xl border border-line bg-card p-6 sm:p-8">
       <Eyebrow>{t('attenteTitre')}</Eyebrow>
+
+      {/* Le parcours par redirection est le seul où l'acheteur quitte le site.
+          Il revient sans savoir si son paiement a compté : on lui dit quoi
+          attendre, et on lui donne de quoi vérifier tout de suite. */}
+      {redirige && !timedOut && (
+        <div className="space-y-3 rounded-xl border border-line bg-raise p-4">
+          <p className="text-sm leading-relaxed text-ink-muted">{t('retourOperateur')}</p>
+          <button
+            type="button"
+            onClick={onVerifier}
+            className="w-full rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-tint"
+          >
+            {t('dejaPaye')}
+          </button>
+          {authUrl && (
+            <a
+              href={authUrl}
+              className="block text-center text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
+            >
+              {t('reprendreChezOperateur')}
+            </a>
+          )}
+        </div>
+      )}
 
       {!timedOut && (
         <>
@@ -642,6 +722,16 @@ function Waiting({
       {timedOut && (
         <>
           <p className="text-sm leading-relaxed text-ink-muted">{t('expire')}</p>
+          {/* Vérifier d'abord, recommencer ensuite : proposer l'inverse a fait
+              payer deux fois des acheteurs dont le premier paiement était
+              passé mais dont la confirmation tardait. */}
+          <button
+            type="button"
+            onClick={onVerifier}
+            className="inline-flex w-full items-center justify-center rounded-xl bg-ink px-6 py-3 font-medium text-canvas transition hover:opacity-90"
+          >
+            {t('dejaPaye')}
+          </button>
           <button
             type="button"
             onClick={onRetry}

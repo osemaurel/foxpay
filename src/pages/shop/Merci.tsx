@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { lienWhatsapp } from '../../lib/contact'
 import { callFunction } from '../../lib/supabase'
 import { useLangue } from '../../lib/i18n'
 import { Alert, Eyebrow, Spinner } from '../../components/ui'
@@ -144,6 +145,22 @@ export default function Merci() {
             {t('merciAide')(contact)}
           </p>
         )}
+
+        {/* Le dernier recours, et il doit être visible sans chercher : celui qui
+            ne trouve pas son fichier ici ouvrira sinon un litige chez son
+            opérateur, ce qui coûte la vente et le compte marchand avec. */}
+        <a
+          href={lienWhatsapp(
+            reponse.product_title
+              ? `Bonjour, au sujet de mon achat « ${reponse.product_title} » :`
+              : 'Bonjour, au sujet de mon achat :',
+          )}
+          target="_blank"
+          rel="noreferrer"
+          className="block rounded-xl bg-[#25d366] px-6 py-3.5 text-center text-sm font-medium text-[#0b3d20] transition hover:opacity-90"
+        >
+          {t('merciWhatsapp')}
+        </a>
       </section>
 
       <Link

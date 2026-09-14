@@ -1,4 +1,5 @@
 import { requireEnv } from './admin.ts'
+import { lienWhatsapp } from './contact.ts'
 import type { Langue } from './langue.ts'
 
 /**
@@ -113,6 +114,12 @@ ${
       )}</p>`
     : ''
 }
+${blocWhatsapp(
+  langue,
+  langue === 'en'
+    ? `Hello, about my purchase of “${productTitle}”:`
+    : `Bonjour, au sujet de mon achat « ${productTitle} » :`,
+)}
 <p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(shopName)}</p>`, langue)
 }
 
@@ -216,6 +223,12 @@ ${
       )}</p>`
     : ''
 }
+${blocWhatsapp(
+  r.langue,
+  r.langue === 'en'
+    ? `Hello, I can't download “${r.productTitle}”:`
+    : `Bonjour, je n'arrive pas à télécharger « ${r.productTitle} » :`,
+)}
 <p style="color:#94a3b8;font-size:13px;margin:24px 0 0">${escapeHtml(r.shopName)}</p>`,
       r.langue,
     ),
@@ -435,6 +448,38 @@ padding:13px;border-radius:8px;text-decoration:none;font-weight:600">${AVIS.what
       d.langue,
     ),
   })
+}
+
+// ============================================================
+// Le recours : une personne, pas un formulaire
+// ============================================================
+
+/**
+ * Le bouton WhatsApp qui clôt chaque courrier envoyé à l'acheteur.
+ *
+ * Sans lui, quelqu'un dont le lien ne s'ouvre pas n'a aucun interlocuteur : la
+ * boutique n'a pas toujours d'adresse de contact, et l'expéditeur de ce
+ * courrier ne lui dit rien. Son seul recours devient alors le litige chez son
+ * opérateur de paiement — ce qui coûte la vente, et à la longue le compte
+ * marchand. Un message WhatsApp coûte trente secondes.
+ */
+const SECOURS = {
+  intro: {
+    fr: 'Un problème ? Écris-nous, une vraie personne te répond.',
+    en: 'A problem? Message us — a real person will answer.',
+  },
+  bouton: { fr: 'Écrire sur WhatsApp', en: 'Message us on WhatsApp' },
+} as const
+
+function blocWhatsapp(langue: Langue, sujet: string): string {
+  const lien = lienWhatsapp(sujet)
+  if (!lien) return ''
+
+  return `<div style="margin:28px 0 0;padding:20px 0 0;border-top:1px solid #e2e8f0">
+<p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 16px">${SECOURS.intro[langue]}</p>
+<a href="${lien}" style="display:block;background:#25d366;color:#0b3d20;text-align:center;
+padding:13px;border-radius:8px;text-decoration:none;font-weight:600">${SECOURS.bouton[langue]}</a>
+</div>`
 }
 
 // ============================================================

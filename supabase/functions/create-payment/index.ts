@@ -290,7 +290,49 @@ Deno.serve(async (req) => {
   const ctx = { order, methode, amount, currency: priced.currency, numero, otp, langue }
 
   if (processeur === 'pawapay') return await payerPawapay({ ...ctx, item, shop })
-  if (processeur === 'saspay') return await payerSaspay({ ...ctx, email, name })
+  if (processeur === 'sebpay') return await payerSebpay(ctx)
+
+  const reponse = await payerSaspay({ ...ctx, email, name })
+  if (reponse) return reponse
+
+  // SasPay n'avait pas de passerelle pour cette méthode à cet instant. Rien
+  // n'est parti sur le téléphone de l'acheteur : on peut repartir ailleurs
+  // sans risque de double débit, et sous le même identifiant de commande.
+  //
+  // Vers SebPay et lui seul. Il prend le numéro et le montant sous la forme
+  // exacte qu'on vient de préparer pour SasPay, donc la bascule est un
+  // remplacement à l'identique. pawaPay, lui, veut un MSISDN qu'il a
+  // lui-même canonisé et vérifie des bornes de montant : l'y envoyer sans
+  // repasser par tout ce travail échouerait plus souvent qu'autre chose.
+  //
+  // Et pas de bascule vers un opérateur qui réclame un code que l'acheteur
+  // n'a pas saisi : on remplacerait un mur par un autre.
+  const versSebpay = Boolean(methode.sebpay) && (!methode.sebpay!.otpRequired || Boolean(otp))
+
+  if (!versSebpay) {
+    await marquerEchec(
+      order.id,
+      'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      `Aucune route disponible pour ${methode.saspay?.code ?? methode.method}.`,
+    )
+    return json(
+      {
+        error: describeFailure('PROVIDER_TEMPORARILY_UNAVAILABLE', langue),
+        failure_code: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      },
+      409,
+    )
+  }
+
+  // Le processeur porté par la commande doit suivre : c'est lui qu'on
+  // réinterrogera pour savoir si elle a abouti.
+  await admin
+    .from('orders')
+    .update({ provider: 'sebpay', mmo_provider: methode.sebpay!.code })
+    .eq('id', order.id)
+
+  console.warn('create-payment: bascule saspay -> sebpay', methode.country, methode.method)
+
   return await payerSebpay(ctx)
 })
 
@@ -458,7 +500,31 @@ function emailDeclare(acheteur: string): string {
   return EMAIL.test(declaree) ? declaree : acheteur
 }
 
-async function payerSaspay(ctx: Contexte & { email: string; name: string }): Promise<Response> {
+/**
+ * SasPay annonce une méthode à son catalogue sans toujours avoir de passerelle
+ * derrière, et le dit seulement au moment de payer : « Réseau non routé »,
+ * « Aucun fournisseur disponible pour le réseau … ».
+ *
+ * Ce n'est pas un refus de paiement, c'est une absence de route — et elle va
+ * et vient. Orange Cameroun a fait 42 % un jour sans panne et 5 % le lendemain
+ * avec vingt-sept murs. L'acheteur, lui, voit « le paiement a échoué » et
+ * conclut que la boutique ne marche pas.
+ */
+function estUneAbsenceDeRoute(e: SasPayError): boolean {
+  if (e.code === 'no_route_available') return true
+
+  const message = e.message.toLowerCase()
+  return message.includes('non rout') || message.includes('aucun fournisseur')
+}
+
+/**
+ * Renvoie `null` — et rien d'autre — quand SasPay n'a pas de route : c'est au
+ * répartiteur de tenter le processeur suivant. La commande reste alors intacte,
+ * ni payée ni échouée, puisque rien n'est parti sur le téléphone de l'acheteur.
+ */
+async function payerSaspay(
+  ctx: Contexte & { email: string; name: string },
+): Promise<Response | null> {
   const { order, methode } = ctx
   const { prenom, nom } = couperNom(ctx.name)
 
@@ -479,6 +545,14 @@ async function payerSaspay(ctx: Contexte & { email: string; name: string }): Pro
       description: 'Achat en ligne',
     })
   } catch (e) {
+    // Pas de route chez eux : on ne conclut rien, le répartiteur ira voir
+    // ailleurs. Surtout, on ne marque pas la commande en échec — elle va
+    // repartir chez un autre processeur avec le même identifiant.
+    if (e instanceof SasPayError && estUneAbsenceDeRoute(e)) {
+      console.warn('create-payment: saspay sans route', methode.saspay?.code, e.message)
+      return null
+    }
+
     if (e instanceof SasPayError && e.status < 500) {
       // Refus à l'initiation. Deux familles bien distinctes : ce que l'acheteur
       // a saisi et peut corriger — son email, son numéro —, et ce qui ne dépend
@@ -500,7 +574,19 @@ async function payerSaspay(ctx: Contexte & { email: string; name: string }): Pro
 
   // L'identifiant SasPay est ce qui relie leur webhook à cette commande : leur
   // enveloppe ne renvoie pas nos métadonnées. Il est donc gardé tout de suite.
-  await admin.from('orders').update({ deposit_id: paiement.id }).eq('id', order.id)
+  //
+  // L'adresse d'autorisation l'est aussi, comme chez SebPay. Leur API softpay
+  // n'accepte aucune URL de retour : l'acheteur part chez Wave et rien ne le
+  // ramène. S'il revient de lui-même, c'est cette adresse gardée qui lui
+  // permet de reprendre là où il s'était arrêté — sans elle, on ne pouvait
+  // plus rien lui proposer.
+  await admin
+    .from('orders')
+    .update({
+      deposit_id: paiement.id,
+      authorization_url: paiement.checkout_url || null,
+    })
+    .eq('id', order.id)
 
   return json({
     order_id: order.id,

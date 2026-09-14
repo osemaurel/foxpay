@@ -200,6 +200,15 @@ const TEXTES = {
     en: 'Still nothing after five minutes. The PIN prompt has probably expired. If you did pay, the download email will arrive anyway — check your inbox.',
   },
   recommencer: { fr: 'Recommencer le paiement', en: 'Start the payment over' },
+  retourOperateur: {
+    fr: "Tu as été redirigé vers ton opérateur pour payer. Une fois le paiement validé, reviens ici : cette page se met à jour toute seule. Si tu viens de payer, appuie ci-dessous.",
+    en: 'You were sent to your provider to pay. Once the payment is confirmed, come back here — this page updates on its own. If you just paid, tap below.',
+  },
+  dejaPaye: { fr: "J'ai déjà payé — vérifier", en: 'I already paid — check now' },
+  reprendreChezOperateur: {
+    fr: "Retourner sur l'écran de paiement",
+    en: 'Go back to the payment screen',
+  },
 
   // --- Payé ---
   cestRegle: { fr: "C'est réglé", en: 'All set' },
@@ -255,6 +264,10 @@ const TEXTES = {
   merciAide: {
     fr: (email: string) => `Toujours rien ? Écris à ${email}, on te renvoie le fichier.`,
     en: (email: string) => `Still nothing? Write to ${email} and we'll resend the file.`,
+  },
+  merciWhatsapp: {
+    fr: 'Un souci ? Écris-nous sur WhatsApp',
+    en: 'A problem? Message us on WhatsApp',
   },
   merciVerification: { fr: 'Vérification du paiement…', en: 'Checking your payment…' },
   merciIntrouvable: {

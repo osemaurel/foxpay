@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom'
+import { lienWhatsapp } from '../lib/contact'
 import { useLangue, type Langue } from '../lib/i18n'
 
 /**
@@ -89,11 +90,37 @@ export default function Telechargement() {
 
   const message = (MESSAGES[params.get('raison') ?? ''] ?? MESSAGES.panne)[affichee]
 
+  const aide =
+    affichee === 'fr'
+      ? { titre: 'Écris-nous, on règle ça', bouton: 'Écrire sur WhatsApp' }
+      : { titre: "Message us and we'll sort it out", bouton: 'Message us on WhatsApp' }
+
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-16">
-      <section className="w-full max-w-md rounded-2xl border border-line bg-card p-8 text-center">
-        <h1 className="text-xl font-medium text-ink">{message.titre}</h1>
-        <p className="mt-3 text-sm leading-relaxed text-ink-muted">{message.corps}</p>
+      <section className="w-full max-w-md space-y-6 rounded-2xl border border-line bg-card p-8 text-center">
+        <div>
+          <h1 className="text-xl font-medium text-ink">{message.titre}</h1>
+          <p className="mt-3 text-sm leading-relaxed text-ink-muted">{message.corps}</p>
+        </div>
+
+        {/* Quelqu'un qui atterrit ici a payé et n'a pas son fichier. C'est
+            exactement la personne qui, faute d'interlocuteur, ouvre un litige
+            chez son opérateur. */}
+        <div className="border-t border-line-soft pt-5">
+          <p className="text-sm text-ink-muted">{aide.titre}</p>
+          <a
+            href={lienWhatsapp(
+              affichee === 'fr'
+                ? 'Bonjour, mon lien de téléchargement ne fonctionne pas :'
+                : "Hello, my download link isn't working:",
+            )}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 block rounded-xl bg-[#25d366] px-6 py-3.5 text-sm font-medium text-[#0b3d20] transition hover:opacity-90"
+          >
+            {aide.bouton}
+          </a>
+        </div>
       </section>
     </main>
   )
