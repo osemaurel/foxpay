@@ -53,9 +53,19 @@ Deno.serve(async (req) => {
   }
 
   // URL signée de courte durée : le temps de la redirection, pas plus.
+  //
+  // Par défaut, le fichier part en pièce jointe (`download`) : c'est le
+  // téléchargement qui fonctionne déjà pour l'immense majorité, on n'y touche
+  // pas. Avec `?view=1`, il est servi en ligne — le PDF s'ouvre dans le
+  // navigateur au lieu d'être enregistré. C'est le recours pour les navigateurs
+  // intégrés (celui de Facebook, celui de l'app Wave) où le téléchargement
+  // forcé n'aboutit pas et laisse une page blanche. Cette voie ne s'ouvre que
+  // si on la demande : personne que le téléchargement direct satisfait n'est
+  // affecté.
+  const enLigne = url.searchParams.get('view') === '1'
   const { data: signed, error: signError } = await admin.storage
     .from('product-files')
-    .createSignedUrl(row.file_path, 60, { download: row.file_name ?? true })
+    .createSignedUrl(row.file_path, 60, enLigne ? {} : { download: row.file_name ?? true })
 
   if (signError || !signed) {
     console.error('createSignedUrl', signError)

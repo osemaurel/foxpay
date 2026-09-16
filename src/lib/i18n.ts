@@ -223,6 +223,10 @@ const TEXTES = {
       }, and stays good for 7 days.`,
   },
   telechargerMaintenant: { fr: 'Télécharger maintenant', en: 'Download now' },
+  ouvrirEnLigne: {
+    fr: "Le fichier ne s'ouvre pas ? Ouvre-le dans le navigateur",
+    en: "File won't open? Open it in your browser",
+  },
 
   // --- Page de confirmation ---
   merciTitre: { fr: 'Paiement réussi', en: 'Payment successful' },

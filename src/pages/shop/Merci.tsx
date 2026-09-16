@@ -105,12 +105,24 @@ export default function Merci() {
         </div>
 
         {reponse.download_url && (
-          <a
-            href={reponse.download_url}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-ink px-6 py-4 text-base font-medium text-canvas transition hover:opacity-90"
-          >
-            {t('telechargerMaintenant')}
-          </a>
+          <>
+            <a
+              href={reponse.download_url}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-ink px-6 py-4 text-base font-medium text-canvas transition hover:opacity-90"
+            >
+              {t('telechargerMaintenant')}
+            </a>
+            {/* Le recours quand le bouton ci-dessus n'aboutit pas : ouvrir le
+                document dans le navigateur au lieu de l'enregistrer. C'est ce
+                qui débloque les navigateurs intégrés (Facebook, Wave) où le
+                téléchargement direct laisse une page blanche. */}
+            <a
+              href={`${reponse.download_url}&view=1`}
+              className="block text-sm text-ink-faint underline underline-offset-2 hover:text-ink"
+            >
+              {t('ouvrirEnLigne')}
+            </a>
+          </>
         )}
 
         <p className="text-sm leading-relaxed text-ink-muted">

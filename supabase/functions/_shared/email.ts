@@ -58,6 +58,11 @@ const LIVRAISON = {
       `Your payment for <strong>${titre}</strong> is confirmed. Here is your download link:`,
   },
   bouton: { fr: 'Télécharger', en: 'Download' },
+  recours: {
+    fr: (url: string) =>
+      `Le bouton ne s'ouvre pas ? <a href="${url}">Ouvre le fichier ici</a>.`,
+    en: (url: string) => `Button not opening? <a href="${url}">Open the file here</a>.`,
+  },
   validite: {
     fr: 'Ce lien est valable <strong>7 jours</strong> et utilisable <strong>3 fois</strong>. Pense à enregistrer le fichier sur ton appareil.',
     en: 'This link is good for <strong>7 days</strong> and can be used <strong>3 times</strong>. Remember to save the file to your device.',
@@ -105,6 +110,8 @@ function buildDownloadHtml({
 ${LIVRAISON.intro[langue](escapeHtml(productTitle))}</p>
 <a href="${downloadUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
 padding:14px;border-radius:8px;text-decoration:none;font-weight:600">${LIVRAISON.bouton[langue]}</a>
+<p style="color:#64748b;font-size:13px;line-height:1.6;margin:12px 0 0;text-align:center">
+${LIVRAISON.recours[langue](`${downloadUrl}&view=1`)}</p>
 <p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">
 ${LIVRAISON.validite[langue]}</p>
 ${
@@ -182,6 +189,11 @@ const RAPPEL = {
 
 const RAPPEL_BOUTON = { fr: 'Télécharger mon fichier', en: 'Download my file' }
 
+const RAPPEL_RECOURS = {
+  fr: (url: string) => `Le bouton ne s'ouvre pas ? <a href="${url}">Ouvre le fichier ici</a>.`,
+  en: (url: string) => `Button not opening? <a href="${url}">Open the file here</a>.`,
+} as const
+
 const RAPPEL_CONTACT = {
   fr: (email: string) =>
     `Le lien ne fonctionne pas ? Réponds à cet email ou écris à <a href="mailto:${email}">${email}</a>.`,
@@ -214,6 +226,8 @@ export function sendReminderEmail(r: Rappel): Promise<void> {
 ${texte.intro[r.langue](escapeHtml(r.productTitle))}</p>
 <a href="${r.downloadUrl}" style="display:block;background:#0f172a;color:#fff;text-align:center;
 padding:14px;border-radius:8px;text-decoration:none;font-weight:600">${RAPPEL_BOUTON[r.langue]}</a>
+<p style="color:#64748b;font-size:13px;line-height:1.6;margin:12px 0 0;text-align:center">
+${RAPPEL_RECOURS[r.langue](`${r.downloadUrl}&view=1`)}</p>
 <p style="color:#64748b;font-size:14px;line-height:1.6;margin:24px 0 0">
 ${texte.astuce[r.langue]}</p>
 ${
