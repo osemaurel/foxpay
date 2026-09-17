@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import { chargerCommandes } from '../../lib/supabase'
 import type { Order } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
 import { Card } from '../../components/ui'
@@ -12,11 +12,9 @@ export default function Home() {
   const [orders, setOrders] = useState<Order[] | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('orders')
-      .select('*')
-      .eq('shop_id', shop.id)
-      .then(({ data }) => setOrders(data ?? []))
+    chargerCommandes(shop.id)
+      .then(setOrders)
+      .catch(() => setOrders([]))
   }, [shop.id])
 
   const paid = orders?.filter((o) => o.status === 'paid') ?? []

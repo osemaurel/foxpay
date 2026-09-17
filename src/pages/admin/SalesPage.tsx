@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { callFunctionAuth, supabase } from '../../lib/supabase'
+import { callFunctionAuth, chargerCommandes } from '../../lib/supabase'
 import type { Order, Product } from '../../lib/types'
 import { formatCharged, formatDate, formatPrice } from '../../lib/format'
 import { countryName, providerName } from '../../lib/mmo'
@@ -71,12 +71,9 @@ export default function SalesPage() {
   const [openId, setOpenId] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('orders')
-      .select('*')
-      .eq('shop_id', shop.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setOrders(data ?? []))
+    chargerCommandes(shop.id)
+      .then(setOrders)
+      .catch(() => setOrders([]))
   }, [shop.id])
 
   if (!orders) return <Spinner />

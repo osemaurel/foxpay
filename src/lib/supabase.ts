@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { Order } from './types'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -26,6 +27,42 @@ export const supabase = createClient(
   url || 'https://absent.supabase.co',
   anonKey || 'absent',
 )
+
+/**
+ * Toutes les commandes d'une boutique, sans exception.
+ *
+ * PostgREST plafonne chaque réponse à mille lignes. Un simple
+ * `select('*')` ne renvoie donc que les mille commandes les plus récentes — et
+ * dès qu'une boutique dépasse mille tentatives, les vraies ventes plus
+ * anciennes tombent hors de la fenêtre. Les totaux affichés se mettent alors à
+ * *diminuer* à mesure qu'on vend : le résumé, les analytiques et l'export
+ * comptaient tous sur cette lecture tronquée.
+ *
+ * On lit donc page par page jusqu'à épuisement. Quelques milliers de commandes
+ * font deux ou trois allers-retours, pas davantage ; le jour où le volume
+ * l'exigera, ce sera le signal de passer à une agrégation côté base.
+ */
+export async function chargerCommandes(shopId: string): Promise<Order[]> {
+  const PAGE = 1000
+  const tout: Order[] = []
+
+  for (let debut = 0; ; debut += PAGE) {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('shop_id', shopId)
+      .order('created_at', { ascending: false })
+      .range(debut, debut + PAGE - 1)
+
+    if (error) throw error
+    if (!data || data.length === 0) break
+
+    tout.push(...(data as Order[]))
+    if (data.length < PAGE) break
+  }
+
+  return tout
+}
 
 /** Appelle une Edge Function et remonte le message d'erreur du serveur. */
 export async function callFunction<T>(name: string, body: unknown): Promise<T> {
