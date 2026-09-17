@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { formatDate } from '../../lib/format'
-import { Card, Eyebrow, Spinner } from '../../components/ui'
+import { Card, Eyebrow, Paginated, Spinner } from '../../components/ui'
 
 /**
  * Ce que les acheteurs ont répondu, un jour après leur achat.
@@ -106,27 +106,32 @@ export default function AvisClients() {
               : 'Aucun avis dans cette catégorie.'}
           </p>
         ) : (
-          <ul className="space-y-3">
-            {montres.map((a) => (
-              <li key={a.id} className="rounded-xl border border-line bg-raise p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Etoiles note={a.rating} />
-                  <span className="text-xs text-ink-faint">{formatDate(a.created_at)}</span>
-                </div>
+          <Paginated
+            items={montres}
+            render={(visibles) => (
+              <ul className="space-y-3">
+                {visibles.map((a) => (
+                  <li key={a.id} className="rounded-xl border border-line bg-raise p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Etoiles note={a.rating} />
+                      <span className="text-xs text-ink-faint">{formatDate(a.created_at)}</span>
+                    </div>
 
-                {a.body && (
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink">
-                    {a.body}
-                  </p>
-                )}
+                    {a.body && (
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+                        {a.body}
+                      </p>
+                    )}
 
-                <p className="mt-3 text-xs text-ink-faint">
-                  {a.orders?.buyer_name || a.orders?.buyer_email}
-                  {a.orders?.products?.title && ` — ${a.orders.products.title}`}
-                </p>
-              </li>
-            ))}
-          </ul>
+                    <p className="mt-3 text-xs text-ink-faint">
+                      {a.orders?.buyer_name || a.orders?.buyer_email}
+                      {a.orders?.products?.title && ` — ${a.orders.products.title}`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          />
         )}
       </Card>
     </div>

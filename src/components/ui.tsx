@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 /**
  * Petit label mono en capitales, repris de la référence : c'est lui qui donne
@@ -120,6 +120,69 @@ export function Spinner({ label = 'Chargement…' }: { label?: string }) {
       <span className="loader" />
       <span className="sr-only">{label}</span>
     </div>
+  )
+}
+
+/**
+ * Découpe une liste en pages, avec l'état de page géré ici.
+ *
+ * Le tri et le filtrage restent à l'appelant : ce composant ne connaît que
+ * « combien d'éléments, quelle taille de page », et rend les éléments de la
+ * page courante via `render`. Il se remet à la première page dès que le nombre
+ * total change — un filtre qui réduit la liste ne doit pas laisser le lecteur
+ * bloqué sur une page 7 devenue vide.
+ *
+ * En dessous d'une page, aucun contrôle n'apparaît : inutile d'afficher
+ * « page 1 sur 1 ».
+ */
+export function Paginated<T>({
+  items,
+  pageSize = 25,
+  render,
+}: {
+  items: T[]
+  pageSize?: number
+  render: (visibles: T[]) => ReactNode
+}) {
+  const [page, setPage] = useState(0)
+  const pages = Math.max(1, Math.ceil(items.length / pageSize))
+
+  // La liste a pu rétrécir sous nos pieds (filtre, recherche) : on ramène la
+  // page dans les bornes plutôt que d'afficher du vide.
+  const courante = Math.min(page, pages - 1)
+  if (courante !== page) setPage(courante)
+
+  const debut = courante * pageSize
+  const visibles = items.slice(debut, debut + pageSize)
+
+  return (
+    <>
+      {render(visibles)}
+
+      {pages > 1 && (
+        <div className="mt-4 flex items-center justify-between gap-3 text-sm">
+          <button
+            type="button"
+            onClick={() => setPage(courante - 1)}
+            disabled={courante === 0}
+            className="rounded-lg border border-line px-3 py-1.5 text-ink-muted transition hover:bg-tint disabled:opacity-40"
+          >
+            ← Précédent
+          </button>
+          <span className="tabular-nums text-ink-faint">
+            {debut + 1}–{Math.min(debut + pageSize, items.length)} sur {items.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage(courante + 1)}
+            disabled={courante >= pages - 1}
+            className="rounded-lg border border-line px-3 py-1.5 text-ink-muted transition hover:bg-tint disabled:opacity-40"
+          >
+            Suivant →
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 

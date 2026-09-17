@@ -3,7 +3,7 @@ import { callFunctionAuth, chargerCommandes } from '../../lib/supabase'
 import type { Order, Product } from '../../lib/types'
 import { formatCharged, formatDate, formatPrice } from '../../lib/format'
 import { countryName, providerName } from '../../lib/mmo'
-import { Card, Eyebrow, Spinner, inputClass } from '../../components/ui'
+import { Card, Eyebrow, Paginated, Spinner, inputClass } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
 const STATUS: Record<Order['status'], { text: string; className: string }> = {
@@ -173,19 +173,22 @@ export default function SalesPage() {
                   }. Clique sur une ligne pour voir le détail.`
                 : 'Clique sur une ligne pour voir le détail de la commande.'}
             </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-line text-ink-faint">
-                  <tr>
-                    <th className="py-2 pr-4 font-medium">Date</th>
-                    <th className="py-2 pr-4 font-medium">Acheteur</th>
-                    <th className="py-2 pr-4 font-medium">Payé</th>
-                    <th className="py-2 pr-4 font-medium">Pays</th>
-                    <th className="py-2 font-medium">Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((order) => (
+            <Paginated
+              items={shown}
+              render={(visibles) => (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="border-b border-line text-ink-faint">
+                      <tr>
+                        <th className="py-2 pr-4 font-medium">Date</th>
+                        <th className="py-2 pr-4 font-medium">Acheteur</th>
+                        <th className="py-2 pr-4 font-medium">Payé</th>
+                        <th className="py-2 pr-4 font-medium">Pays</th>
+                        <th className="py-2 font-medium">Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibles.map((order) => (
                     <tr
                       key={order.id}
                       onClick={() => setOpenId(order.id)}
@@ -223,10 +226,12 @@ export default function SalesPage() {
                         </span>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            />
           </>
         )}
       </Card>
