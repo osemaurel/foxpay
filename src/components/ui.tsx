@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 
 /**
  * Petit label mono en capitales, repris de la référence : c'est lui qui donne
@@ -32,22 +32,53 @@ export function Card({
   )
 }
 
+/**
+ * Un champ étiqueté.
+ *
+ * L'enveloppe est un `<label>`, ce qui est le bon choix pour un champ ordinaire :
+ * cliquer sur l'intitulé met le curseur dedans.
+ *
+ * Mais un `<label>` renvoie **tous** les clics qu'il reçoit vers le premier
+ * contrôle qu'il contient. Avec un éditeur de texte riche à l'intérieur, ce
+ * premier contrôle est le bouton « Gras » de la barre d'outils : cliquer dans la
+ * zone de texte donnait le focus à ce bouton, et plus rien ne s'écrivait. Passer
+ * `group` sort de l'étiquette pour ces cas-là — le lien avec l'intitulé est
+ * rétabli par `aria-labelledby`, donc rien n'est perdu pour qui navigue au
+ * lecteur d'écran.
+ */
 export function Field({
   label,
   hint,
+  group,
   children,
 }: {
   label: string
   hint?: string
+  /** Le contenu n'est pas un champ unique : barre d'outils, groupe de boutons… */
+  group?: boolean
   children: ReactNode
 }) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-ink">{label}</span>
+  const id = useId()
+
+  const contenu = (
+    <>
+      <span id={id} className="mb-2 block text-sm font-medium text-ink">
+        {label}
+      </span>
       {children}
       {hint && <span className="mt-2 block text-xs leading-relaxed text-ink-faint">{hint}</span>}
-    </label>
+    </>
   )
+
+  if (group) {
+    return (
+      <div role="group" aria-labelledby={id} className="block">
+        {contenu}
+      </div>
+    )
+  }
+
+  return <label className="block">{contenu}</label>
 }
 
 export const inputClass =

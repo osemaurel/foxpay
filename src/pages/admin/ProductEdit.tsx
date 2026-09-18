@@ -204,6 +204,7 @@ export default function ProductEdit() {
           </Field>
 
           <Field
+            group
             label="Description"
             hint="Gras, italique, listes, titres. La mise en forme apparaît telle quelle sur la boutique."
           >

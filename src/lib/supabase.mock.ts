@@ -326,6 +326,17 @@ const readAsDataUrl = (file: File) =>
     reader.readAsDataURL(file)
   })
 
+/**
+ * Les mêmes points d'entrée que le vrai module, sinon l'aperçu casse au
+ * chargement — un export manquant ici arrête React avant le premier rendu.
+ */
+export const urlFonction = (nom: string) => `https://apercu.local/functions/v1/${nom}`
+
+/** L'aperçu tient dans une page : pas de pagination à dérouler. */
+export async function chargerCommandes(shopId: string): Promise<Order[]> {
+  return (TABLES.orders as Order[]).filter((o) => o.shop_id === shopId)
+}
+
 export const supabase = {
   from: (table: string) => {
     const rows = TABLES[table] ?? []
