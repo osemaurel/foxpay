@@ -29,6 +29,19 @@ type Corps = {
 /** Ce qu'on accepte d'un commentaire libre, comme en base. */
 const MAX_COMMENTAIRE = 2000
 
+/**
+ * La commande relue, avec sa boutique et son produit. Les deux jointures
+ * arrivent en `unknown` : le client Supabase ne les type pas, et les décrire
+ * ici évite de le faire à chaque lecture.
+ */
+type Commande = {
+  id: string
+  status: string
+  locale: string
+  shops: { whatsapp_support: string | null }
+  products: { title: string }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return fail('Méthode non autorisée', 405)
@@ -42,19 +55,20 @@ Deno.serve(async (req) => {
 
   if (!corps.order_id) return fail('Commande manquante')
 
-  const { data: order } = await admin
+  const { data } = await admin
     .from('orders')
     .select('id, status, locale, shops!inner(whatsapp_support), products!inner(title)')
     .eq('id', corps.order_id)
     .maybeSingle()
 
+  const order = data as Commande | null
   if (!order) return fail('Commande introuvable', 404)
 
   // Payée seulement. Sans ça, n'importe quelle commande abandonnée — et il y en
   // a beaucoup — deviendrait une porte ouverte pour écrire dans la base.
   if (order.status !== 'paid') return fail('Commande introuvable', 404)
 
-  const product = order.products as { title: string }
+  const product = order.products
   const langue = lireLangue(order.locale)
 
   const { data: existant } = await admin
@@ -68,7 +82,7 @@ Deno.serve(async (req) => {
       product_title: product.title,
       deja_donne: existant !== null,
       whatsapp_url: lienWhatsapp(
-        (order.shops as { whatsapp_support: string | null }).whatsapp_support,
+        order.shops.whatsapp_support,
         langue === 'en'
           ? `Hello, about my order for “${product.title}”:`
           : `Bonjour, au sujet de ma commande « ${product.title} » :`,
