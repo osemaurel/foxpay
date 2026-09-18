@@ -29,6 +29,16 @@ export const supabase = createClient(
 )
 
 /**
+ * L'adresse publique d'une Edge Function.
+ *
+ * Sert à montrer au vendeur l'adresse de webhook qu'il doit déclarer chez son
+ * processeur. Elle se déduit du projet, elle n'a pas à être recopiée à la main
+ * quelque part — une adresse de webhook fausse ne se voit pas : les paiements
+ * marchent quand même, ils sont juste confirmés en retard.
+ */
+export const urlFonction = (nom: string) => `${url}/functions/v1/${nom}`
+
+/**
  * Toutes les commandes d'une boutique, sans exception.
  *
  * PostgREST plafonne chaque réponse à mille lignes. Un simple

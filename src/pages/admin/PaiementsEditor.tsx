@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, urlFonction } from '../../lib/supabase'
 import { Alert, Button, Card, Field, inputClass } from '../../components/ui'
 import { useAdmin } from './AdminLayout'
 
@@ -36,6 +36,11 @@ export default function PaiementsEditor() {
   const [busy, setBusy] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [enregistre, setEnregistre] = useState(false)
+  const [adresseCopiee, setAdresseCopiee] = useState(false)
+
+  // La même pour toutes les boutiques : c'est le secret déposé ici qui dit de
+  // laquelle vient chaque avis de paiement.
+  const adresseWebhook = urlFonction('saspay-callback')
 
   const charger = useCallback(async () => {
     const { data } = await supabase.rpc('etat_identifiants_processeur', { p_shop: shop.id })
@@ -114,12 +119,39 @@ export default function PaiementsEditor() {
               />
             </Field>
 
+            <div className="rounded-xl border border-line bg-raise p-4">
+              <p className="text-sm font-medium text-ink">Adresse à déclarer chez SasPay</p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+                Crée un webhook chez SasPay avec cette adresse, et <strong>coche les événements
+                de transaction</strong> — sans eux, SasPay n'envoie rien et tes ventes sont
+                confirmées avec du retard. SasPay t'affiche alors un secret : c'est lui qui va
+                dans le champ ci-dessous.
+              </p>
+              <code className="mt-3 block break-all font-mono text-xs text-ink-muted">
+                {adresseWebhook}
+              </code>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(adresseWebhook)
+                    setAdresseCopiee(true)
+                  } catch {
+                    setErreur("L'adresse n'a pas pu être copiée. Sélectionne-la à la main.")
+                  }
+                }}
+                className="mt-2 text-sm text-ink-muted underline underline-offset-2 transition hover:text-ink"
+              >
+                {adresseCopiee ? 'Copiée' : "Copier l'adresse"}
+              </button>
+            </div>
+
             <Field
               label="Secret de webhook"
               hint={
                 etat?.webhook_configure
                   ? 'Un secret est enregistré. Laisse vide pour le garder.'
-                  : "Sans lui, les ventes sont confirmées avec quelques minutes de retard. Chez SasPay, déclare l'adresse de webhook et coche les événements de transaction."
+                  : 'Sans lui, les ventes sont confirmées avec quelques minutes de retard.'
               }
             >
               <input
