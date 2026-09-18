@@ -24,6 +24,12 @@ export type Identifiants = {
   apiKey: string
   /** Absent tant que le vendeur n'a pas collé son secret de webhook. */
   webhookSecret: string | null
+  /**
+   * L'adresse déclarée à SasPay à la place de celle de l'acheteur, pour que
+   * leurs reçus ne partent pas chez lui. Absente = comportement normal de
+   * SasPay : c'est l'acheteur qui les reçoit.
+   */
+  emailRecus: string | null
 }
 
 type Regime = {
@@ -85,13 +91,6 @@ export async function processeursAutorises(shopId: string): Promise<Set<Processe
 export async function identifiantsSaspay(shopId: string): Promise<Identifiants | null> {
   const { plateforme } = await regime(shopId)
 
-  if (plateforme) {
-    return {
-      apiKey: requireEnv('SASPAY_API_KEY'),
-      webhookSecret: Deno.env.get('SASPAY_WEBHOOK_SECRET') ?? null,
-    }
-  }
-
   const { data, error } = await admin.rpc('lire_identifiants_processeur', {
     p_shop: shopId,
     p_processor: 'saspay',
@@ -102,10 +101,28 @@ export async function identifiantsSaspay(shopId: string): Promise<Identifiants |
     return null
   }
 
-  const ligne = (data ?? [])[0] as { api_key: string | null; webhook_secret: string | null } | undefined
+  const ligne = (data ?? [])[0] as
+    | { api_key: string | null; webhook_secret: string | null; email_recus: string | null }
+    | undefined
+
+  // La boutique d'origine encaisse avec les secrets d'environnement. Elle lit
+  // quand même la ligne, parce que l'adresse des reçus, elle, est un réglage
+  // ordinaire que son propriétaire modifie depuis ses paramètres.
+  if (plateforme) {
+    return {
+      apiKey: requireEnv('SASPAY_API_KEY'),
+      webhookSecret: Deno.env.get('SASPAY_WEBHOOK_SECRET') ?? null,
+      emailRecus: ligne?.email_recus ?? null,
+    }
+  }
+
   if (!ligne?.api_key) return null
 
-  return { apiKey: ligne.api_key, webhookSecret: ligne.webhook_secret }
+  return {
+    apiKey: ligne.api_key,
+    webhookSecret: ligne.webhook_secret,
+    emailRecus: ligne.email_recus,
+  }
 }
 
 /**

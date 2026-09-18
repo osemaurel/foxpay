@@ -43,6 +43,8 @@ const shop: Shop = {
   contact_email: 'bonjour@atelierkodi.ci',
   // Aucun pixel dans l'aperçu : pas de script tiers ni d'appel vers Meta.
   facebook_pixel_id: null,
+  whatsapp_support: '+225 07 00 00 00 00',
+  identifiants_plateforme: false,
   created_at: daysAgo(60),
   updated_at: daysAgo(2),
 }

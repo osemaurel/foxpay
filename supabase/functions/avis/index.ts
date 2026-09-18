@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
   const { data: order } = await admin
     .from('orders')
-    .select('id, status, locale, products!inner(title)')
+    .select('id, status, locale, shops!inner(whatsapp_support), products!inner(title)')
     .eq('id', corps.order_id)
     .maybeSingle()
 
@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
       product_title: product.title,
       deja_donne: existant !== null,
       whatsapp_url: lienWhatsapp(
+        (order.shops as { whatsapp_support: string | null }).whatsapp_support,
         langue === 'en'
           ? `Hello, about my order for “${product.title}”:`
           : `Bonjour, au sujet de ma commande « ${product.title} » :`,

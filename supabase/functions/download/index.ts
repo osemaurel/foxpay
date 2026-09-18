@@ -18,8 +18,27 @@ import { lireLangue, type Langue } from '../_shared/langue.ts'
  * La langue voyage dans le lien (`lang`) posé au moment de l'envoi et suit
  * jusqu'à la page de refus.
  */
-const pageDeRefus = (raison: string, langue: Langue) =>
-  `${SITE_URL()}/telechargement?raison=${raison}&lang=${langue}`
+const pageDeRefus = (raison: string, langue: Langue, whatsapp?: string | null) =>
+  `${SITE_URL()}/telechargement?raison=${raison}&lang=${langue}` +
+  (whatsapp ? `&wa=${encodeURIComponent(whatsapp)}` : '')
+
+/**
+ * Le numéro WhatsApp du vendeur, pour la page de refus.
+ *
+ * Elle est servie par le site, qui ne sait pas de quelle boutique vient le
+ * lien : on le lui dit dans l'adresse. Ce numéro appartient à la boutique — y
+ * mettre celui de la plateforme enverrait l'acheteur d'un vendeur écrire à un
+ * autre. Une lecture ratée ne bloque rien : la page s'affiche sans le bouton.
+ */
+async function numeroDuVendeur(token: string): Promise<string | null> {
+  const { data } = await admin
+    .from('orders')
+    .select('shops!inner(whatsapp_support)')
+    .eq('download_token', token)
+    .maybeSingle()
+
+  return (data?.shops as { whatsapp_support: string | null } | undefined)?.whatsapp_support ?? null
+}
 
 Deno.serve(async (req) => {
   const url = new URL(req.url)
@@ -33,23 +52,27 @@ Deno.serve(async (req) => {
   // qu'un aperçu brûle un téléchargement que l'acheteur n'a pas fait.
   if (req.method === 'HEAD') return new Response(null, { status: 200 })
 
+  // Le numéro du vendeur, lu une fois : tous les refus ci-dessous l'affichent,
+  // et c'est justement là que l'acheteur a besoin de quelqu'un.
+  const whatsapp = await numeroDuVendeur(token)
+
   const { data, error } = await admin.rpc('consume_download', { p_token: token })
   if (error) {
     console.error('consume_download', error)
-    return Response.redirect(pageDeRefus('panne', langue), 302)
+    return Response.redirect(pageDeRefus('panne', langue, whatsapp), 302)
   }
 
   const row = (data as { file_path: string | null; file_name: string | null; refusal: string | null }[])[0]
 
   if (!row || row.refusal) {
-    return Response.redirect(pageDeRefus(row?.refusal ?? 'not_found', langue), 302)
+    return Response.redirect(pageDeRefus(row?.refusal ?? 'not_found', langue, whatsapp), 302)
   }
 
   if (!row.file_path) {
     // Le vendeur a retiré le fichier après la vente : ce n'est pas la faute de
     // l'acheteur, et le compteur a déjà été décrémenté. À traiter à la main.
     console.error('commande payée sans fichier', token)
-    return Response.redirect(pageDeRefus('retire', langue), 302)
+    return Response.redirect(pageDeRefus('retire', langue, whatsapp), 302)
   }
 
   // URL signée de courte durée : le temps de la redirection, pas plus.
@@ -69,7 +92,7 @@ Deno.serve(async (req) => {
 
   if (signError || !signed) {
     console.error('createSignedUrl', signError)
-    return Response.redirect(pageDeRefus('inaccessible', langue), 302)
+    return Response.redirect(pageDeRefus('inaccessible', langue, whatsapp), 302)
   }
 
   return Response.redirect(signed.signedUrl, 302)

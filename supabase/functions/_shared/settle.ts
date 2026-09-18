@@ -47,7 +47,7 @@ const CHAMPS =
   'id, shop_id, status, provider, deposit_id, delivered_at, download_token, buyer_email, created_at, ' +
   'failure_code, authorization_url, provider_checked_at, locale, ' +
   'buyer_name, buyer_phone, charged_amount, charged_currency, country, mmo_provider, ' +
-  'shops(name, contact_email, owner_id), products(title)'
+  'shops(name, contact_email, owner_id, whatsapp_support), products(title)'
 
 type Commande = {
   id: string
@@ -74,7 +74,12 @@ type Commande = {
   products: unknown
 }
 
-type Boutique = { name: string; contact_email: string | null; owner_id: string }
+type Boutique = {
+  name: string
+  contact_email: string | null
+  owner_id: string
+  whatsapp_support: string | null
+}
 
 /**
  * Règle une commande à partir de l'état réel du paiement chez son processeur.
@@ -406,6 +411,7 @@ async function deliver(order: Commande): Promise<void> {
     productTitle: product.title,
     downloadUrl: downloadUrl(order.download_token, langue),
     contactEmail: shop.contact_email,
+    whatsapp: shop.whatsapp_support,
     langue,
   })
 

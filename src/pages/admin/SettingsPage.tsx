@@ -5,6 +5,7 @@ import { slugify } from '../../lib/slug'
 import type { Shop } from '../../lib/types'
 import { Alert, Button, Card, Field, ImagePicker, inputClass } from '../../components/ui'
 import CurrenciesEditor from './CurrenciesEditor'
+import PaiementsEditor from './PaiementsEditor'
 import PaymentMethodsEditor from './PaymentMethodsEditor'
 import { useAdmin } from './AdminLayout'
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
         banner_url: form.banner_url,
         accent_color: form.accent_color,
         contact_email: form.contact_email,
+        whatsapp_support: form.whatsapp_support || null,
         facebook_pixel_id: form.facebook_pixel_id || null,
       })
       .eq('id', shop.id)
@@ -184,6 +186,22 @@ export default function SettingsPage() {
               className={inputClass}
             />
           </Field>
+
+          {/* Un acheteur bloqué qui ne trouve personne à qui parler ouvre un
+              litige chez son opérateur : ça coûte la vente, et à la longue le
+              compte marchand. Ce numéro est le recours. */}
+          <Field
+            label="Numéro WhatsApp"
+            hint="Proposé à l'acheteur dans les emails et sur les pages où son fichier ne s'ouvre pas. Avec l'indicatif du pays. Vide, aucun bouton WhatsApp n'est affiché."
+          >
+            <input
+              type="tel"
+              placeholder="Aucun"
+              value={form.whatsapp_support ?? ''}
+              onChange={(e) => set('whatsapp_support', e.target.value)}
+              className={inputClass}
+            />
+          </Field>
         </div>
       </Card>
 
@@ -196,6 +214,7 @@ export default function SettingsPage() {
         </div>
       </form>
 
+      <PaiementsEditor />
       <CurrenciesEditor />
       <PaymentMethodsEditor />
     </>

@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     .from('orders')
     .select(
       'id, download_token, download_reminders, buyer_email, locale, ' +
-        'shops!inner(name, contact_email), products!inner(title)',
+        'shops!inner(name, contact_email, whatsapp_support), products!inner(title)',
     )
     .eq('status', 'paid')
     .eq('download_count', 0)
@@ -80,7 +80,11 @@ Deno.serve(async (req) => {
   let envoyes = 0
 
   for (const brut of (data ?? []) as Commande[]) {
-    const shop = brut.shops as { name: string; contact_email: string | null }
+    const shop = brut.shops as {
+      name: string
+      contact_email: string | null
+      whatsapp_support: string | null
+    }
     const product = brut.products as { title: string }
     const langue = lireLangue(brut.locale)
 
@@ -91,6 +95,7 @@ Deno.serve(async (req) => {
         productTitle: product.title,
         downloadUrl: downloadUrl(brut.download_token, langue),
         contactEmail: shop.contact_email,
+        whatsapp: shop.whatsapp_support,
         langue,
         rang: brut.download_reminders === 0 ? 1 : 2,
       })

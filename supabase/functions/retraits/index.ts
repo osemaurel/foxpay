@@ -47,11 +47,20 @@ Deno.serve(async (req) => {
   // La boutique de la personne connectée : c'est elle qui porte les retraits.
   const { data: shop } = await admin
     .from('shops')
-    .select('id')
+    .select('id, identifiants_plateforme')
     .eq('owner_id', auth.user.id)
     .maybeSingle()
 
   if (!shop) return fail('Aucune boutique', 404)
+
+  // Les soldes et les virements d'ici sont ceux des portefeuilles pawaPay de la
+  // plateforme. Une boutique qui encaisse sur son propre compte SasPay n'a rien
+  // à y voir : sans ce contrôle, elle lirait la trésorerie d'autrui et pourrait
+  // s'en virer une part. Elle retire depuis le tableau de bord de son
+  // processeur, là où son argent se trouve réellement.
+  if (!shop.identifiants_plateforme) {
+    return fail('Les retraits se font depuis le tableau de bord de ton processeur de paiement', 403)
+  }
 
   try {
     switch (body.action) {

@@ -318,7 +318,13 @@ Deno.serve(async (req) => {
     )
   }
 
-  const reponse = await payerSaspay({ ...ctx, email, name, cleSaspay: identifiants.apiKey })
+  const reponse = await payerSaspay({
+    ...ctx,
+    email,
+    name,
+    cleSaspay: identifiants.apiKey,
+    emailRecus: identifiants.emailRecus,
+  })
   if (reponse) return reponse
 
   // SasPay n'avait pas de passerelle pour cette méthode à cet instant. Rien
@@ -520,17 +526,18 @@ function couperNom(complet: string): { prenom: string; nom: string } {
  * Le rapprochement reste possible par le téléphone, qui est le vrai
  * identifiant, et par `metadata.order_id` qu'on envoie déjà.
  *
- * Le secret `SASPAY_CUSTOMER_EMAIL` permet d'en changer sans redéployer.
+ * L'adresse se règle boutique par boutique, dans les paramètres : celle du
+ * vendeur, pas celle d'un autre. Laissée vide, on donne à SasPay l'adresse de
+ * l'acheteur — leur reçu lui parvient, ce qui est leur comportement normal.
  *
- * Si l'adresse retenue est mal formée, on retombe sur celle de l'acheteur :
- * SasPay refuserait une adresse invalide par un `validation_error`, que nous
- * traduisons en « corrige ton email » — et l'acheteur passerait sa journée à
- * corriger le sien, qui n'y est pour rien. Encaisser prime sur la discrétion.
+ * Si l'adresse retenue est mal formée, on retombe aussi sur celle de
+ * l'acheteur : SasPay refuserait une adresse invalide par un
+ * `validation_error`, que nous traduisons en « corrige ton email » — et
+ * l'acheteur passerait sa journée à corriger le sien, qui n'y est pour rien.
+ * Encaisser prime sur la discrétion.
  */
-const EMAIL_SASPAY = 'my2023projects@gmail.com'
-
-function emailDeclare(acheteur: string): string {
-  const declaree = Deno.env.get('SASPAY_CUSTOMER_EMAIL')?.trim() || EMAIL_SASPAY
+function emailDeclare(recus: string | null, acheteur: string): string {
+  const declaree = (recus ?? '').trim()
   return EMAIL.test(declaree) ? declaree : acheteur
 }
 
@@ -557,7 +564,7 @@ function estUneAbsenceDeRoute(e: SasPayError): boolean {
  * ni payée ni échouée, puisque rien n'est parti sur le téléphone de l'acheteur.
  */
 async function payerSaspay(
-  ctx: Contexte & { email: string; name: string; cleSaspay: string },
+  ctx: Contexte & { email: string; name: string; cleSaspay: string; emailRecus: string | null },
 ): Promise<Response | null> {
   const { order, methode } = ctx
   const { prenom, nom } = couperNom(ctx.name)
@@ -573,7 +580,7 @@ async function payerSaspay(
       country: methode.saspay!.alpha2,
       network: methode.saspay!.code,
       phone: ctx.numero,
-      email: emailDeclare(ctx.email),
+      email: emailDeclare(ctx.emailRecus, ctx.email),
       prenom,
       nom,
       description: 'Achat en ligne',

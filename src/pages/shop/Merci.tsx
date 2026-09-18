@@ -83,6 +83,15 @@ export default function Merci() {
 
   const contact = shop.contact_email
 
+  // Le numéro est celui de la boutique : l'acheteur d'un vendeur ne doit pas
+  // se retrouver à écrire à un autre.
+  const whatsapp = lienWhatsapp(
+    shop.whatsapp_support,
+    reponse.product_title
+      ? `Bonjour, au sujet de mon achat « ${reponse.product_title} » :`
+      : 'Bonjour, au sujet de mon achat :',
+  )
+
   return (
     <div className="mx-auto max-w-lg space-y-6 py-10">
       <section className="space-y-5 rounded-2xl border border-line bg-card p-6 text-center sm:p-8">
@@ -161,18 +170,16 @@ export default function Merci() {
         {/* Le dernier recours, et il doit être visible sans chercher : celui qui
             ne trouve pas son fichier ici ouvrira sinon un litige chez son
             opérateur, ce qui coûte la vente et le compte marchand avec. */}
-        <a
-          href={lienWhatsapp(
-            reponse.product_title
-              ? `Bonjour, au sujet de mon achat « ${reponse.product_title} » :`
-              : 'Bonjour, au sujet de mon achat :',
-          )}
-          target="_blank"
-          rel="noreferrer"
-          className="block rounded-xl bg-[#25d366] px-6 py-3.5 text-center text-sm font-medium text-[#0b3d20] transition hover:opacity-90"
-        >
-          {t('merciWhatsapp')}
-        </a>
+        {whatsapp && (
+          <a
+            href={whatsapp}
+            target="_blank"
+            rel="noreferrer"
+            className="block rounded-xl bg-[#25d366] px-6 py-3.5 text-center text-sm font-medium text-[#0b3d20] transition hover:opacity-90"
+          >
+            {t('merciWhatsapp')}
+          </a>
+        )}
       </section>
 
       <Link

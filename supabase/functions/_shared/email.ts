@@ -81,6 +81,8 @@ export function sendDownloadEmail(params: {
   productTitle: string
   downloadUrl: string
   contactEmail: string | null
+  /** Le numéro WhatsApp de la boutique. Nul = pas de bouton de secours. */
+  whatsapp: string | null
   langue: Langue
 }): Promise<void> {
   return envoyer({
@@ -96,12 +98,14 @@ function buildDownloadHtml({
   productTitle,
   downloadUrl,
   contactEmail,
+  whatsapp,
   langue,
 }: {
   shopName: string
   productTitle: string
   downloadUrl: string
   contactEmail: string | null
+  whatsapp: string | null
   langue: Langue
 }): string {
   return page(`
@@ -122,6 +126,7 @@ ${
     : ''
 }
 ${blocWhatsapp(
+  whatsapp,
   langue,
   langue === 'en'
     ? `Hello, about my purchase of “${productTitle}”:`
@@ -207,6 +212,8 @@ export type Rappel = {
   productTitle: string
   downloadUrl: string
   contactEmail: string | null
+  /** Le numéro WhatsApp de la boutique. Nul = pas de bouton de secours. */
+  whatsapp: string | null
   langue: Langue
   /** 1 = celui de quelques minutes, 2 = celui de quelques heures. */
   rang: 1 | 2
@@ -238,6 +245,7 @@ ${
     : ''
 }
 ${blocWhatsapp(
+  r.whatsapp,
   r.langue,
   r.langue === 'en'
     ? `Hello, I can't download “${r.productTitle}”:`
@@ -485,8 +493,8 @@ const SECOURS = {
   bouton: { fr: 'Écrire sur WhatsApp', en: 'Message us on WhatsApp' },
 } as const
 
-function blocWhatsapp(langue: Langue, sujet: string): string {
-  const lien = lienWhatsapp(sujet)
+function blocWhatsapp(numero: string | null, langue: Langue, sujet: string): string {
+  const lien = lienWhatsapp(numero, sujet)
   if (!lien) return ''
 
   return `<div style="margin:28px 0 0;padding:20px 0 0;border-top:1px solid #e2e8f0">

@@ -10,6 +10,16 @@ export type Shop = {
   contact_email: string | null
   /** Pixel Meta, chiffres uniquement. Vide = aucun script tiers sur la boutique. */
   facebook_pixel_id: string | null
+  /**
+   * Le numéro WhatsApp du service après-vente, affiché à l'acheteur dans les
+   * emails et sur les pages de recours. Vide = aucun bouton WhatsApp.
+   */
+  whatsapp_support: string | null
+  /**
+   * La boutique d'origine, qui encaisse avec les clés de la plateforme. Les
+   * autres déposent les leurs dans les paramètres.
+   */
+  identifiants_plateforme: boolean
   created_at: string
   updated_at: string
 }

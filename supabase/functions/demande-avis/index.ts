@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
 
   const { data, error } = await admin
     .from('orders')
-    .select('id, buyer_email, locale, shops!inner(name, slug, contact_email), products!inner(title)')
+    .select('id, buyer_email, locale, shops!inner(name, slug, contact_email, whatsapp_support), products!inner(title)')
     .eq('status', 'paid')
     .is('review_requested_at', null)
     .gt('download_count', 0)
@@ -56,7 +56,12 @@ Deno.serve(async (req) => {
   let envoyes = 0
 
   for (const brut of (data ?? []) as Commande[]) {
-    const shop = brut.shops as { name: string; slug: string; contact_email: string | null }
+    const shop = brut.shops as {
+      name: string
+      slug: string
+      contact_email: string | null
+      whatsapp_support: string | null
+    }
     const product = brut.products as { title: string }
     const langue = lireLangue(brut.locale)
 
@@ -69,6 +74,7 @@ Deno.serve(async (req) => {
         // Le message pré-rempli épargne à l'acheteur d'avoir à expliquer d'où
         // il sort, et au vendeur d'avoir à le deviner.
         whatsappUrl: lienWhatsapp(
+          shop.whatsapp_support,
           langue === 'en'
             ? `Hello, about my order for “${product.title}”:`
             : `Bonjour, au sujet de ma commande « ${product.title} » :`,

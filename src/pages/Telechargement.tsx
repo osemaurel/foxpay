@@ -90,6 +90,16 @@ export default function Telechargement() {
 
   const message = (MESSAGES[params.get('raison') ?? ''] ?? MESSAGES.panne)[affichee]
 
+  // Le numéro du vendeur voyage dans l'adresse : cette page est servie par le
+  // site, qui ne sait pas d'où vient le lien. Absent, le bouton disparaît
+  // plutôt que d'envoyer l'acheteur chez quelqu'un d'autre.
+  const whatsapp = lienWhatsapp(
+    params.get('wa'),
+    affichee === 'fr'
+      ? 'Bonjour, mon lien de téléchargement ne fonctionne pas :'
+      : "Hello, my download link isn't working:",
+  )
+
   const aide =
     affichee === 'fr'
       ? { titre: 'Écris-nous, on règle ça', bouton: 'Écrire sur WhatsApp' }
@@ -106,21 +116,19 @@ export default function Telechargement() {
         {/* Quelqu'un qui atterrit ici a payé et n'a pas son fichier. C'est
             exactement la personne qui, faute d'interlocuteur, ouvre un litige
             chez son opérateur. */}
-        <div className="border-t border-line-soft pt-5">
-          <p className="text-sm text-ink-muted">{aide.titre}</p>
-          <a
-            href={lienWhatsapp(
-              affichee === 'fr'
-                ? 'Bonjour, mon lien de téléchargement ne fonctionne pas :'
-                : "Hello, my download link isn't working:",
-            )}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 block rounded-xl bg-[#25d366] px-6 py-3.5 text-sm font-medium text-[#0b3d20] transition hover:opacity-90"
-          >
-            {aide.bouton}
-          </a>
-        </div>
+        {whatsapp && (
+          <div className="border-t border-line-soft pt-5">
+            <p className="text-sm text-ink-muted">{aide.titre}</p>
+            <a
+              href={whatsapp}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 block rounded-xl bg-[#25d366] px-6 py-3.5 text-sm font-medium text-[#0b3d20] transition hover:opacity-90"
+            >
+              {aide.bouton}
+            </a>
+          </div>
+        )}
       </section>
     </main>
   )

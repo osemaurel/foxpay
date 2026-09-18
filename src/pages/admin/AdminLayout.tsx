@@ -19,12 +19,20 @@ export function useAdmin() {
   return useOutletContext<AdminContext>()
 }
 
-const TABS = [
+type Onglet = {
+  to: string
+  label: string
+  end: boolean
+  /** Réservé à la boutique qui encaisse avec les clés de la plateforme. */
+  plateforme?: boolean
+}
+
+const TABS: Onglet[] = [
   { to: '/admin', label: 'Accueil', end: true },
   { to: '/admin/produits', label: 'Produits', end: false },
   { to: '/admin/ventes', label: 'Ventes', end: false },
   { to: '/admin/avis', label: 'Avis', end: false },
-  { to: '/admin/retraits', label: 'Retraits', end: false },
+  { to: '/admin/retraits', label: 'Retraits', end: false, plateforme: true },
   { to: '/admin/parametres', label: 'Paramètres', end: false },
 ]
 
@@ -83,7 +91,10 @@ export default function AdminLayout({ session }: { session: Session }) {
     <Shell email={session.user.email} shop={shop}>
       <nav className="border-b border-line bg-raise">
         <div className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-4">
-          {TABS.map((tab) => (
+          {/* Les retraits passent par les portefeuilles pawaPay de la
+              plateforme. Une boutique qui encaisse sur son propre compte SasPay
+              retire depuis le tableau de bord de SasPay, pas d'ici. */}
+          {TABS.filter((tab) => !tab.plateforme || shop.identifiants_plateforme).map((tab) => (
             <NavLink
               key={tab.to}
               to={tab.to}
