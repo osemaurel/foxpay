@@ -1,5 +1,3 @@
-import { requireEnv } from './admin.ts'
-
 /**
  * Intégration SasPay — API v1, endpoint « softpay ».
  *
@@ -24,9 +22,17 @@ import { requireEnv } from './admin.ts'
 
 const BASE = 'https://api.saspay.me/api/v1'
 
-function headers(idempotence?: string): HeadersInit {
+/**
+ * La clé arrive en paramètre, elle n'est plus lue dans l'environnement.
+ *
+ * Chaque boutique encaisse sur son propre compte SasPay : la clé dépend donc de
+ * la vente en cours, pas de la plateforme. Une clé lue globalement ici ferait
+ * tomber l'argent d'un vendeur sur le compte d'un autre — c'est exactement ce
+ * que ce paramètre rend impossible.
+ */
+function headers(cle: string, idempotence?: string): HeadersInit {
   const base: Record<string, string> = {
-    Authorization: `Bearer ${requireEnv('SASPAY_API_KEY')}`,
+    Authorization: `Bearer ${cle}`,
     'Content-Type': 'application/json',
   }
   if (idempotence) base['Idempotency-Key'] = idempotence
@@ -52,8 +58,13 @@ export class SasPayError extends Error {
  * dictionnaire de validation champ par champ. On aplatit le second pour que
  * l'appelant n'ait jamais qu'une chaîne à afficher ou à journaliser.
  */
-async function appel<T>(chemin: string, init: RequestInit = {}, idempotence?: string): Promise<T> {
-  const res = await fetch(`${BASE}${chemin}`, { ...init, headers: headers(idempotence) })
+async function appel<T>(
+  chemin: string,
+  cle: string,
+  init: RequestInit = {},
+  idempotence?: string,
+): Promise<T> {
+  const res = await fetch(`${BASE}${chemin}`, { ...init, headers: headers(cle, idempotence) })
   const texte = await res.text()
 
   let corps: {
@@ -150,8 +161,8 @@ export type SasPayNetwork = {
   is_active: boolean
 }
 
-/** Catalogue public : c'est le seul endpoint qui ne demande pas de clé. */
-export const listCountries = () => appel<SasPayCountry[]>('/countries/')
+/** Le référentiel des pays. */
+export const listCountries = (cle: string) => appel<SasPayCountry[]>('/countries/', cle)
 
 /**
  * Les réseaux, avec leur état réel.
@@ -160,8 +171,11 @@ export const listCountries = () => appel<SasPayCountry[]>('/countries/')
  * n'étant routé vers aucun gateway. Proposer un opérateur inactif ferait
  * échouer le paiement au dernier moment, avec un `invalid_method`.
  */
-export async function listNetworks(): Promise<SasPayNetwork[]> {
-  const page = await appel<{ results?: SasPayNetwork[] } | SasPayNetwork[]>('/networks/?page_size=200')
+export async function listNetworks(cle: string): Promise<SasPayNetwork[]> {
+  const page = await appel<{ results?: SasPayNetwork[] } | SasPayNetwork[]>(
+    '/networks/?page_size=200',
+    cle,
+  )
   return Array.isArray(page) ? page : (page.results ?? [])
 }
 
@@ -186,7 +200,7 @@ export type PaiementCree = {
  * L'acheteur paie donc exactement le prix annoncé, et la commission est
  * prélevée sur ce que la boutique reçoit.
  */
-export function creerPaiement(input: {
+export function creerPaiement(cle: string, input: {
   /** Sert de clé d'idempotence : l'identifiant de notre commande. */
   reference: string
   amount: number
@@ -202,6 +216,7 @@ export function creerPaiement(input: {
 }): Promise<PaiementCree> {
   return appel<PaiementCree>(
     '/payments/softpay/',
+    cle,
     {
       method: 'POST',
       body: JSON.stringify({
@@ -240,8 +255,11 @@ export type EtatPaiement = {
  * lui-même au gateway avant de répondre — c'est donc une source de vérité,
  * pas un statut mémorisé.
  */
-export async function lirePaiement(id: string): Promise<EtatPaiement> {
-  const data = await appel<Record<string, unknown>>(`/payments/${encodeURIComponent(id)}/verify/`)
+export async function lirePaiement(cle: string, id: string): Promise<EtatPaiement> {
+  const data = await appel<Record<string, unknown>>(
+    `/payments/${encodeURIComponent(id)}/verify/`,
+    cle,
+  )
 
   return {
     status: String(data.status ?? ''),
@@ -251,8 +269,8 @@ export async function lirePaiement(id: string): Promise<EtatPaiement> {
 }
 
 /** Confirme un paiement par code OTP, pour les réseaux qui l'exigent. */
-export function confirmerOtp(id: string, otp: string): Promise<unknown> {
-  return appel(`/payments/${encodeURIComponent(id)}/confirm-otp/`, {
+export function confirmerOtp(cle: string, id: string, otp: string): Promise<unknown> {
+  return appel(`/payments/${encodeURIComponent(id)}/confirm-otp/`, cle, {
     method: 'POST',
     body: JSON.stringify({ otp }),
   })
@@ -285,6 +303,7 @@ const TOLERANCE_S = 300
  * l'ordre des clés ou le format des nombres, et la comparaison échouerait.
  */
 export async function verifierSignature(
+  secret: string,
   corpsBrut: string,
   signature: string | null,
   horodatage: string | null,
@@ -296,7 +315,7 @@ export async function verifierSignature(
 
   const cle = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(requireEnv('SASPAY_WEBHOOK_SECRET')),
+    new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],

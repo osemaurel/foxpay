@@ -1,6 +1,7 @@
 import { admin } from './admin.ts'
 import type { Langue } from './langue.ts'
 import { getActiveConf, type CountryConf } from './pawapay.ts'
+import { cleCataloguePlateforme, processeursAutorises } from './identifiants.ts'
 import { listCountries, listOperators, type SebPayCountry, type SebPayOperator } from './sebpay.ts'
 import {
   listCountries as listSasCountries,
@@ -176,6 +177,25 @@ export function processeurParDefaut(m: Methode): Processeur | null {
   return null
 }
 
+/**
+ * Le même choix, mais restreint aux processeurs dont la boutique possède les
+ * clés.
+ *
+ * C'est le garde-fou qui empêche l'argent de changer de poche : sans lui, une
+ * boutique sans aucun identifiant retombait sur pawaPay — le compte de la
+ * plateforme — et encaissait chez quelqu'un d'autre. Aucun processeur
+ * autorisé, aucun encaissement.
+ */
+export function processeurParDefautParmi(
+  m: Methode,
+  autorises: Set<Processeur>,
+): Processeur | null {
+  if (m.pawapay && autorises.has('pawapay')) return 'pawapay'
+  if (m.sebpay && autorises.has('sebpay')) return 'sebpay'
+  if (m.saspay && autorises.has('saspay')) return 'saspay'
+  return null
+}
+
 // ============================================================
 // Catalogue SebPay, mis en cache
 // ============================================================
@@ -240,7 +260,11 @@ async function catalogueSaspay(): Promise<CatalogueSaspay | null> {
   if (frais) return cache.payload as CatalogueSaspay
 
   try {
-    const [pays, reseaux] = await Promise.all([listSasCountries(), listSasNetworks()])
+    // Le catalogue des pays et réseaux est le même pour tous les marchands
+    // SasPay : on le lit une fois avec la clé de la plateforme, pas boutique
+    // par boutique.
+    const cle = cleCataloguePlateforme()
+    const [pays, reseaux] = await Promise.all([listSasCountries(cle), listSasNetworks(cle)])
     const payload: CatalogueSaspay = { pays, reseaux }
 
     await admin
@@ -438,10 +462,13 @@ export type Verdict = {
  * défaut — une boutique neuve encaisse partout sans rien régler.
  */
 export async function resolveurDeMethodes(shopId: string) {
-  const { data } = await admin
-    .from('payment_routes')
-    .select('country, method, processor, enabled')
-    .eq('shop_id', shopId)
+  const [{ data }, autorises] = await Promise.all([
+    admin
+      .from('payment_routes')
+      .select('country, method, processor, enabled')
+      .eq('shop_id', shopId),
+    processeursAutorises(shopId),
+  ])
 
   const reglages = new Map<string, LigneReglage>(
     (data ?? []).map((r) => [
@@ -454,16 +481,18 @@ export async function resolveurDeMethodes(shopId: string) {
     const reglage = reglages.get(`${m.country}:${m.method}`)
     const voulu = reglage?.processor as Processeur | null | undefined
 
-    // Un choix qui ne correspond plus à rien — opérateur retiré du compte —
-    // ne doit pas rendre la méthode impayable : on retombe sur le défaut.
+    // Un choix qui ne correspond plus à rien — opérateur retiré du compte,
+    // clés jamais déposées — ne doit pas rendre la méthode impayable : on
+    // retombe sur le défaut. Mais toujours parmi les processeurs dont la
+    // boutique a les clés : un vendeur n'encaisse jamais chez un autre.
     const processeur =
-      voulu === 'pawapay' && m.pawapay
+      voulu === 'pawapay' && m.pawapay && autorises.has('pawapay')
         ? 'pawapay'
-        : voulu === 'sebpay' && m.sebpay
+        : voulu === 'sebpay' && m.sebpay && autorises.has('sebpay')
           ? 'sebpay'
-          : voulu === 'saspay' && m.saspay
+          : voulu === 'saspay' && m.saspay && autorises.has('saspay')
             ? 'saspay'
-            : processeurParDefaut(m)
+            : processeurParDefautParmi(m, autorises)
 
     return { processeur, active: reglage?.enabled ?? true }
   }

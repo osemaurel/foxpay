@@ -4,6 +4,7 @@ import { sendDownloadEmail, sendSaleEmail } from './email.ts'
 import { lireLangue } from './langue.ts'
 import { getDeposit } from './pawapay.ts'
 import { getCollection, readStatus, SebPayError } from './sebpay.ts'
+import { identifiantsSaspay } from './identifiants.ts'
 import { lirePaiement, lireStatut, SasPayError } from './saspay.ts'
 
 /**
@@ -43,13 +44,14 @@ export type SettleOutcome = {
 }
 
 const CHAMPS =
-  'id, status, provider, deposit_id, delivered_at, download_token, buyer_email, created_at, ' +
+  'id, shop_id, status, provider, deposit_id, delivered_at, download_token, buyer_email, created_at, ' +
   'failure_code, authorization_url, provider_checked_at, locale, ' +
   'buyer_name, buyer_phone, charged_amount, charged_currency, country, mmo_provider, ' +
   'shops(name, contact_email, owner_id), products(title)'
 
 type Commande = {
   id: string
+  shop_id: string
   status: string
   provider: string
   deposit_id: string
@@ -290,9 +292,20 @@ export async function settleSaspayWebhook(
  * créé. C'est bien ce qu'on veut dire dans les deux cas.
  */
 async function reglerSaspay(order: Commande): Promise<SettleOutcome> {
+  // La clé de la boutique qui a vendu, jamais une clé globale : c'est son
+  // compte SasPay qu'il faut interroger pour savoir si elle a été payée.
+  const identifiants = await identifiantsSaspay(order.shop_id)
+  if (!identifiants) {
+    // Sans clé, on ne sait rien. On laisse la commande en attente plutôt que
+    // de la déclarer échouée : un vendeur qui recolle sa clé doit retrouver
+    // ses ventes, pas un cimetière d'échecs inventés.
+    console.error('settle saspay : aucune clé pour la boutique', order.shop_id)
+    return done('pending')
+  }
+
   let etat
   try {
-    etat = await lirePaiement(order.deposit_id)
+    etat = await lirePaiement(identifiants.apiKey, order.deposit_id)
   } catch (e) {
     // 404 : SasPay ne connaît pas ce paiement. Comme ailleurs, ce n'est un
     // échec qu'une fois passé le délai de grâce.

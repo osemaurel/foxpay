@@ -8,6 +8,7 @@ import {
 } from '../_shared/catalogue.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 import { describeFailure } from '../_shared/failures.ts'
+import { identifiantsSaspay, processeursAutorises } from '../_shared/identifiants.ts'
 import { lireLangue, type Langue } from '../_shared/langue.ts'
 import {
   createDeposit,
@@ -168,8 +169,15 @@ Deno.serve(async (req) => {
 
   let catalogue: Methode[]
   let reglage: (m: Methode) => Verdict
+  // Les processeurs dont **cette** boutique a les clés. Rien n'encaisse en
+  // dehors de cette liste — ni le routage, ni le repli plus bas.
+  let autorises: Set<'pawapay' | 'sebpay' | 'saspay'>
   try {
-    ;[catalogue, reglage] = await Promise.all([catalogueUnifie(), resolveurDeMethodes(shop.id)])
+    ;[catalogue, reglage, autorises] = await Promise.all([
+      catalogueUnifie(),
+      resolveurDeMethodes(shop.id),
+      processeursAutorises(shop.id),
+    ])
   } catch (e) {
     console.error('create-payment: catalogue', e)
     return fail(dire('moyensIndisponibles'), 502)
@@ -292,7 +300,25 @@ Deno.serve(async (req) => {
   if (processeur === 'pawapay') return await payerPawapay({ ...ctx, item, shop })
   if (processeur === 'sebpay') return await payerSebpay(ctx)
 
-  const reponse = await payerSaspay({ ...ctx, email, name })
+  // Les clés SasPay de la boutique. Le routage a déjà écarté SasPay si elle
+  // n'en a pas ; ce contrôle est la ceinture qui double les bretelles.
+  const identifiants = await identifiantsSaspay(shop.id)
+  if (!identifiants) {
+    await marquerEchec(
+      order.id,
+      'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      'Aucune clé SasPay enregistrée pour cette boutique.',
+    )
+    return json(
+      {
+        error: describeFailure('PROVIDER_TEMPORARILY_UNAVAILABLE', langue),
+        failure_code: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      },
+      409,
+    )
+  }
+
+  const reponse = await payerSaspay({ ...ctx, email, name, cleSaspay: identifiants.apiKey })
   if (reponse) return reponse
 
   // SasPay n'avait pas de passerelle pour cette méthode à cet instant. Rien
@@ -307,7 +333,15 @@ Deno.serve(async (req) => {
   //
   // Et pas de bascule vers un opérateur qui réclame un code que l'acheteur
   // n'a pas saisi : on remplacerait un mur par un autre.
-  const versSebpay = Boolean(methode.sebpay) && (!methode.sebpay!.otpRequired || Boolean(otp))
+  //
+  // Surtout : uniquement si **cette boutique** possède les clés SebPay. Sans
+  // cette condition, le repli enverrait la vente d'un marchand sur le compte
+  // SebPay de la plateforme — il paierait sa panne SasPay en nous donnant son
+  // argent.
+  const versSebpay =
+    Boolean(methode.sebpay) &&
+    autorises.has('sebpay') &&
+    (!methode.sebpay!.otpRequired || Boolean(otp))
 
   if (!versSebpay) {
     await marquerEchec(
@@ -523,14 +557,14 @@ function estUneAbsenceDeRoute(e: SasPayError): boolean {
  * ni payée ni échouée, puisque rien n'est parti sur le téléphone de l'acheteur.
  */
 async function payerSaspay(
-  ctx: Contexte & { email: string; name: string },
+  ctx: Contexte & { email: string; name: string; cleSaspay: string },
 ): Promise<Response | null> {
   const { order, methode } = ctx
   const { prenom, nom } = couperNom(ctx.name)
 
   let paiement
   try {
-    paiement = await creerPaiement({
+    paiement = await creerPaiement(ctx.cleSaspay, {
       // L'identifiant de la commande sert de clé d'idempotence : un retry
       // réseau ne doit jamais pousser une seconde demande sur le téléphone.
       reference: order.id,

@@ -1,5 +1,6 @@
 import { admin } from '../_shared/admin.ts'
-import { catalogueUnifie, processeurParDefaut } from '../_shared/catalogue.ts'
+import { catalogueUnifie, processeurParDefautParmi } from '../_shared/catalogue.ts'
+import { processeursAutorises } from '../_shared/identifiants.ts'
 import { corsHeaders, fail, json } from '../_shared/cors.ts'
 
 /**
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
 
   if (!shop) return fail('Boutique introuvable', 404)
 
-  const [catalogue, routesResult] = await Promise.all([
+  const [catalogue, routesResult, autorises] = await Promise.all([
     catalogueUnifie().catch((e) => {
       console.error('payment-methods: catalogue', e)
       return null
@@ -43,6 +44,10 @@ Deno.serve(async (req) => {
       .from('payment_routes')
       .select('country, method, processor, enabled')
       .eq('shop_id', shop.id),
+    // L'écran de routage ne doit proposer que les processeurs dont cette
+    // boutique a les clés : afficher les autres ferait croire à un choix qui
+    // enverrait l'argent ailleurs.
+    processeursAutorises(shop.id),
   ])
 
   if (!catalogue) {
@@ -64,11 +69,11 @@ Deno.serve(async (req) => {
     const voulu = reglage?.processor ?? null
     const valide =
       voulu === 'pawapay'
-        ? Boolean(m.pawapay)
+        ? Boolean(m.pawapay) && autorises.has('pawapay')
         : voulu === 'sebpay'
-          ? Boolean(m.sebpay)
+          ? Boolean(m.sebpay) && autorises.has('sebpay')
           : voulu === 'saspay'
-            ? Boolean(m.saspay)
+            ? Boolean(m.saspay) && autorises.has('saspay')
             : false
 
     return {
@@ -78,9 +83,9 @@ Deno.serve(async (req) => {
       name: m.name,
       logo: m.logo,
       currency: m.currency,
-      pawapay: Boolean(m.pawapay),
-      sebpay: Boolean(m.sebpay),
-      saspay: Boolean(m.saspay),
+      pawapay: Boolean(m.pawapay) && autorises.has('pawapay'),
+      sebpay: Boolean(m.sebpay) && autorises.has('sebpay'),
+      saspay: Boolean(m.saspay) && autorises.has('saspay'),
       /** Faux quand le vendeur a retiré cette méthode de sa page de paiement. */
       enabled: reglage?.enabled ?? true,
       /** Le choix enregistré, s'il y en a un. */
@@ -88,7 +93,7 @@ Deno.serve(async (req) => {
       /** Vrai si une ligne existe déjà en base pour cette méthode. */
       stored: Boolean(reglage),
       /** Le processeur qui traitera réellement le paiement. */
-      effective: valide ? voulu : processeurParDefaut(m),
+      effective: valide ? voulu : processeurParDefautParmi(m, autorises),
       /** Vrai quand un opérateur pawaPay est temporairement coupé. */
       closed: m.pawapay?.status === 'CLOSED',
     }
