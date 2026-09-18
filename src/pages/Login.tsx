@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useSearchParams } from 'react-router-dom'
+import { callFunction, supabase } from '../lib/supabase'
 import { Alert, Button, Card, Field, inputClass } from '../components/ui'
 
 /** Les messages de Supabase Auth sont en anglais : on traduit les plus courants. */
@@ -8,6 +9,8 @@ function translate(message: string): string {
   if (m.includes('invalid login credentials')) return 'Email ou mot de passe incorrect.'
   if (m.includes('email not confirmed'))
     return "Ce compte existe mais l'email n'a pas encore été confirmé. Ouvre le lien reçu par email, puis reconnecte-toi."
+  if (m.includes('signups not allowed') || m.includes('signup is disabled'))
+    return "La création de compte passe par une invitation. Demande un lien d'invitation."
   if (m.includes('user already registered'))
     return 'Un compte existe déjà avec cet email. Connecte-toi plutôt.'
   if (m.includes('password should be')) return 'Le mot de passe doit faire au moins 8 caractères.'
@@ -17,7 +20,14 @@ function translate(message: string): string {
 }
 
 export default function Login() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [params] = useSearchParams()
+
+  // Le lien d'invitation porte le code : celui qui l'ouvre arrive directement
+  // sur le formulaire de création, sans rien à recopier.
+  const invitation = params.get('invitation') ?? ''
+
+  const [mode, setMode] = useState<'signin' | 'signup'>(invitation ? 'signup' : 'signin')
+  const [code, setCode] = useState(invitation)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -30,21 +40,23 @@ export default function Login() {
     setError(null)
     setNotice(null)
 
-    if (mode === 'signin') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError(translate(error.message))
-    } else {
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) {
-        setError(translate(error.message))
-      } else if (data.session) {
-        // Confirmation désactivée côté projet : on est connecté directement.
-        setNotice('Compte créé.')
+    try {
+      if (mode === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) setError(translate(error.message))
       } else {
-        setNotice(
-          `Compte créé. Un email de confirmation a été envoyé à ${email} — ouvre le lien qu'il contient, puis reviens te connecter.`,
-        )
+        // La création passe par le serveur : l'inscription publique de Supabase
+        // est fermée, et c'est là que l'invitation est vérifiée.
+        await callFunction('inscription', { code, email, password })
+
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) {
+          setNotice('Compte créé. Connecte-toi avec ton email et ton mot de passe.')
+          setMode('signin')
+        }
       }
+    } catch (e) {
+      setError((e as Error).message)
     }
 
     setBusy(false)
@@ -56,6 +68,20 @@ export default function Login() {
         <h1 className="mb-6 text-center text-2xl font-bold text-ink">Administration</h1>
         <Card>
           <form onSubmit={submit} className="space-y-4">
+            {mode === 'signup' && (
+              <Field
+                label="Code d'invitation"
+                hint="Il se trouve dans le lien qu'on t'a envoyé. Sans lui, aucun compte ne peut être créé."
+              >
+                <input
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
+            )}
+
             <Field label="Email">
               <input
                 type="email"
@@ -98,7 +124,7 @@ export default function Login() {
             }}
             className="mt-4 w-full text-sm text-ink-faint transition hover:text-ink"
           >
-            {mode === 'signin' ? 'Créer un compte' : "J'ai déjà un compte"}
+            {mode === 'signin' ? "J'ai une invitation" : "J'ai déjà un compte"}
           </button>
         </Card>
       </div>

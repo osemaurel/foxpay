@@ -5,6 +5,7 @@ import { slugify } from '../../lib/slug'
 import type { Shop } from '../../lib/types'
 import { Alert, Button, Card, Field, ImagePicker, inputClass } from '../../components/ui'
 import CurrenciesEditor from './CurrenciesEditor'
+import InvitationsEditor from './InvitationsEditor'
 import PaiementsEditor from './PaiementsEditor'
 import PaymentMethodsEditor from './PaymentMethodsEditor'
 import { useAdmin } from './AdminLayout'
@@ -217,6 +218,9 @@ export default function SettingsPage() {
       <PaiementsEditor />
       <CurrenciesEditor />
       <PaymentMethodsEditor />
+      {/* Inviter n'a de sens que pour qui tient la plateforme. La fonction
+          appelée le revérifie de son côté. */}
+      {shop.identifiants_plateforme && <InvitationsEditor />}
     </>
   )
 }
