@@ -44,7 +44,9 @@ const shop: Shop = {
   // Aucun pixel dans l'aperçu : pas de script tiers ni d'appel vers Meta.
   facebook_pixel_id: null,
   whatsapp_support: '+225 07 00 00 00 00',
-  identifiants_plateforme: false,
+  // La boutique de l'aperçu tient le rôle de la plateforme : sans ça l'onglet
+  // Retraits, réservé à celle-ci, disparaîtrait de la preview.
+  identifiants_plateforme: true,
   created_at: daysAgo(60),
   updated_at: daysAgo(2),
 }
@@ -268,8 +270,23 @@ const payouts = [
   },
 ]
 
+/**
+ * Le taux du franc congolais, comme un vendeur l'aurait réglé : c'est lui qui
+ * ramène le portefeuille congolais au franc CFA dans le total des retraits.
+ */
+const devises = [
+  {
+    shop_id: 'shop-1',
+    currency: 'CDF',
+    rate: 4.042129,
+    is_active: true,
+    updated_at: daysAgo(3),
+  },
+]
+
 const TABLES: Record<string, Row[]> = {
   shops: [shop] as unknown as Row[],
+  shop_currencies: devises as unknown as Row[],
   products: products as unknown as Row[],
   orders: orders as unknown as Row[],
   reviews: reviews as unknown as Row[],

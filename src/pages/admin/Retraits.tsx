@@ -38,12 +38,58 @@ const SIGLES: Record<string, string> = { XOF: 'FCFA', XAF: 'FCFA' }
 const montantLisible = (valeur: number, devise: string) =>
   `${Math.round(valeur).toLocaleString('fr-FR')} ${SIGLES[devise] ?? devise}`
 
+/** Les deux francs CFA valent la même chose : un solde XAF est déjà un total. */
+const estCFA = (devise: string) => devise === 'XOF' || devise === 'XAF'
+
+/** Le taux réglé par le vendeur : combien de cette devise pour 1 FCFA. */
+type Taux = { rate: number; updatedAt: string }
+
+/**
+ * Ce que pèsent tous les portefeuilles réunis, en francs CFA.
+ *
+ * Les portefeuilles hors zone franc sont ramenés au FCFA avec **le taux que le
+ * vendeur a lui-même réglé** pour vendre dans ce pays : c'est le seul taux dont
+ * on dispose, et c'est celui auquel l'argent est entré. Un portefeuille dont le
+ * taux manque n'est pas deviné — il est laissé de côté et signalé, plutôt que
+ * de fausser un total silencieusement.
+ */
+function totalEnCFA(soldes: Solde[], taux: Record<string, Taux>) {
+  let total = 0
+  const convertis: { devise: string; montant: number; taux: Taux }[] = []
+  const sansTaux: string[] = []
+
+  for (const s of soldes) {
+    if (estCFA(s.currency)) {
+      total += s.balance
+      continue
+    }
+
+    const t = taux[s.currency]
+    if (!t) {
+      sansTaux.push(s.currency)
+      continue
+    }
+
+    total += s.balance / t.rate
+    convertis.push({ devise: s.currency, montant: s.balance, taux: t })
+  }
+
+  return { total, convertis, sansTaux }
+}
+
+/** Un taux vieux de plus d'un mois ne vaut plus grand-chose. */
+const JOURS_AVANT_ALERTE = 30
+
+const joursDepuis = (iso: string) =>
+  Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+
 export default function Retraits() {
   const { shop } = useAdmin()
   const [soldes, setSoldes] = useState<Solde[] | null>(null)
   const [methodes, setMethodes] = useState<Methode[]>([])
   const [erreurSoldes, setErreurSoldes] = useState<string | null>(null)
   const [retraits, setRetraits] = useState<Payout[]>([])
+  const [taux, setTaux] = useState<Record<string, Taux>>({})
 
   const chargerRetraits = useCallback(async () => {
     const { data } = await supabase
@@ -68,6 +114,24 @@ export default function Retraits() {
       setSoldes([])
     }
   }, [])
+
+  // Les taux de la boutique, ceux des Paramètres : ils servent à ramener les
+  // portefeuilles hors zone franc au FCFA.
+  useEffect(() => {
+    supabase
+      .from('shop_currencies')
+      .select('currency, rate, updated_at')
+      .eq('shop_id', shop.id)
+      .eq('is_active', true)
+      .then(({ data }) => {
+        const lus: Record<string, Taux> = {}
+        for (const row of data ?? []) {
+          const rate = Number(row.rate)
+          if (rate > 0) lus[row.currency] = { rate, updatedAt: row.updated_at }
+        }
+        setTaux(lus)
+      })
+  }, [shop.id])
 
   useEffect(() => {
     chargerSoldes()
@@ -126,6 +190,8 @@ export default function Retraits() {
                 </div>
               ))}
             </div>
+            <TotalCFA soldes={garnis} taux={taux} />
+
             <p className="mt-4 text-xs leading-relaxed text-ink-faint">
               Un portefeuille par pays. Un retrait débite celui de la méthode choisie : pour
               tout sortir d'un seul coup, regroupe d'abord les portefeuilles depuis le tableau
@@ -142,6 +208,59 @@ export default function Retraits() {
 
       <Historique retraits={retraits} />
     </>
+  )
+}
+
+/**
+ * Ce que pèsent tous les portefeuilles réunis, en francs CFA.
+ *
+ * Sans cette ligne, il faut convertir le franc congolais de tête pour savoir où
+ * on en est — et c'est le genre de calcul qu'on finit par ne plus faire.
+ *
+ * Le taux employé est affiché, et sa date avec lui quand elle date : un total
+ * calculé sur un taux d'il y a deux mois se lit autrement.
+ */
+function TotalCFA({ soldes, taux }: { soldes: Solde[]; taux: Record<string, Taux> }) {
+  const { total, convertis, sansTaux } = totalEnCFA(soldes, taux)
+
+  // Rien à additionner : un seul portefeuille en francs CFA se lit déjà tout
+  // seul juste au-dessus.
+  if (soldes.length < 2) return null
+
+  return (
+    <div className="mt-4 border-t border-line-soft pt-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm font-medium text-ink">Total</span>
+        <span className="shrink-0 text-lg tabular-nums text-ink">
+          {montantLisible(total, 'XOF')}
+        </span>
+      </div>
+
+      {convertis.map(({ devise, montant, taux: t }) => {
+        const jours = joursDepuis(t.updatedAt)
+        return (
+          <p key={devise} className="mt-2 text-xs leading-relaxed text-ink-faint">
+            Dont {montantLisible(montant, devise)} converti à{' '}
+            {t.rate.toLocaleString('fr-FR', { maximumFractionDigits: 4 })} {devise} pour 1 FCFA
+            {jours > JOURS_AVANT_ALERTE && (
+              <>
+                {' '}
+                — taux réglé il y a {jours} jours, vérifie-le dans Paramètres pour que ce total
+                reste juste.
+              </>
+            )}
+          </p>
+        )
+      })}
+
+      {sansTaux.length > 0 && (
+        <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+          {sansTaux.join(', ')} n'{sansTaux.length > 1 ? 'entrent' : 'entre'} pas dans ce total :
+          aucun taux n'est réglé pour {sansTaux.length > 1 ? 'ces devises' : 'cette devise'} dans
+          Paramètres.
+        </p>
+      )}
+    </div>
   )
 }
 
