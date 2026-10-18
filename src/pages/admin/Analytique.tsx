@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { Order } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
 import {
+  cleAujourdHui,
   parMethode,
   parPays,
   resume,
@@ -314,8 +315,15 @@ function ColonnesJour({
 }
 
 function TableauJours({ serie, devise }: { serie: Jour[]; devise: string }) {
-  // Du plus récent au plus ancien : c'est l'ordre dans lequel on relit ses jours.
-  const lignes = [...serie].reverse().filter((j) => j.ventes > 0)
+  const aujourdHui = cleAujourdHui()
+
+  // Du plus récent au plus ancien : c'est l'ordre dans lequel on relit ses
+  // jours. Les journées creuses sont écartées — sauf celle en cours, qu'on
+  // veut voir même à zéro : c'est la ligne qu'on vient consulter, et son
+  // absence se lirait comme une panne plutôt que comme une matinée calme.
+  const lignes = [...serie]
+    .reverse()
+    .filter((j) => j.ventes > 0 || j.jour === aujourdHui)
 
   if (lignes.length === 0) {
     return <p className="mt-3 text-sm text-ink-faint">Aucune vente sur cette période.</p>
@@ -332,15 +340,26 @@ function TableauJours({ serie, devise }: { serie: Jour[]; devise: string }) {
           </tr>
         </thead>
         <tbody>
-          {lignes.map((j) => (
-            <tr key={j.jour} className="border-b border-line-soft last:border-0">
-              <td className="py-2 text-ink-muted">{jourLong(j.jour)}</td>
-              <td className="py-2 text-right tabular-nums text-ink">{j.ventes}</td>
-              <td className="py-2 text-right tabular-nums text-ink">
-                {formatPrice(Math.round(j.encaisse), devise)}
-              </td>
-            </tr>
-          ))}
+          {lignes.map((j) => {
+            const cEstAujourdHui = j.jour === aujourdHui
+            return (
+              <tr
+                key={j.jour}
+                className={
+                  'border-b border-line-soft last:border-0 ' +
+                  (cEstAujourdHui ? 'font-medium' : '')
+                }
+              >
+                <td className={'py-2 ' + (cEstAujourdHui ? 'text-ink' : 'text-ink-muted')}>
+                  {cEstAujourdHui ? "Aujourd'hui" : jourLong(j.jour)}
+                </td>
+                <td className="py-2 text-right tabular-nums text-ink">{j.ventes}</td>
+                <td className="py-2 text-right tabular-nums text-ink">
+                  {formatPrice(Math.round(j.encaisse), devise)}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { chargerCommandes } from '../../lib/supabase'
 import type { Order } from '../../lib/types'
 import { formatPrice } from '../../lib/format'
+import { duJour } from '../../lib/analytique'
 import { Card } from '../../components/ui'
 import Analytique from './Analytique'
 import { useAdmin } from './AdminLayout'
@@ -20,6 +21,11 @@ export default function Home() {
   const paid = orders?.filter((o) => o.status === 'paid') ?? []
   const pending = orders?.filter((o) => o.status === 'pending') ?? []
   const total = paid.reduce((sum, o) => sum + o.amount, 0)
+
+  // La journée en cours, le chiffre qu'on regarde dix fois par jour. Il vient
+  // de la même série que le graphique plus bas : les deux ne peuvent pas se
+  // contredire.
+  const jour = duJour(orders ?? [])
 
   // Ce qui bloque la vente, dans l'ordre où il faut le régler.
   const steps = [
@@ -73,7 +79,12 @@ export default function Home() {
       )}
 
       <Card title="Tes chiffres">
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
+          <Stat
+            value={String(jour.ventes)}
+            label={jour.ventes > 1 ? "ventes aujourd'hui" : "vente aujourd'hui"}
+            note={jour.encaisse > 0 ? formatPrice(jour.encaisse) : undefined}
+          />
           <Stat value={formatPrice(total)} label="Total encaissé" />
           <Stat value={String(paid.length)} label={paid.length > 1 ? 'ventes' : 'vente'} />
           <Stat value={String(pending.length)} label="paiements en attente" />
@@ -95,11 +106,14 @@ export default function Home() {
   )
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label, note }: { value: string; label: string; note?: string }) {
   return (
-    <div>
-      <p className="text-2xl font-semibold tabular-nums text-ink">{value}</p>
+    <div className="min-w-0">
+      <p className="truncate text-2xl font-semibold tabular-nums text-ink" title={value}>
+        {value}
+      </p>
       <p className="text-sm text-ink-faint">{label}</p>
+      {note && <p className="mt-0.5 truncate text-xs text-ink-faint">{note}</p>}
     </div>
   )
 }

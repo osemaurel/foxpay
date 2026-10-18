@@ -137,9 +137,32 @@ export const nomPays = (code: string) => NOMS_PAYS[code] ?? code
 // Découpage
 // ============================================================
 
+/**
+ * La clé d'un jour, dans le fuseau du vendeur.
+ *
+ * Volontairement pas `toISOString().slice(0, 10)`, qui donne la date **UTC** :
+ * à Douala ou Cotonou, il est déjà demain à 23 h UTC, et une vente de la soirée
+ * serait rangée au lendemain. Pire, la fenêtre du graphique était bornée en
+ * heure locale et les ventes classées en UTC : la dernière colonne portait la
+ * date de la veille, et la journée en cours tombait dans une case jamais
+ * dessinée. Un seul calcul des deux côtés, et le compte tombe juste partout.
+ */
+function cleJour(d: Date): string {
+  const mois = String(d.getMonth() + 1).padStart(2, '0')
+  const jour = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mois}-${jour}`
+}
+
 /** Le jour d'une commande, au sens commercial : celui de l'encaissement. */
 function jourDe(order: Order): string {
-  return (order.paid_at ?? order.created_at).slice(0, 10)
+  return cleJour(new Date(order.paid_at ?? order.created_at))
+}
+
+/** Minuit, aujourd'hui, chez le vendeur. */
+function minuit(): Date {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
 }
 
 /**
@@ -151,8 +174,7 @@ function jourDe(order: Order): string {
 export function surLaPeriode(orders: Order[], jours: number | null): Order[] {
   if (jours === null) return orders
 
-  const debut = new Date()
-  debut.setHours(0, 0, 0, 0)
+  const debut = minuit()
   debut.setDate(debut.getDate() - (jours - 1))
 
   return orders.filter((o) => new Date(o.paid_at ?? o.created_at) >= debut)
@@ -180,23 +202,41 @@ export function serieQuotidienne(orders: Order[], jours: number | null): Jour[] 
   // Le premier jour affiché : le début de la fenêtre, ou la première vente
   // connue quand on regarde tout l'historique.
   const cles = [...parJour.keys()].sort()
-  const fin = new Date()
-  fin.setHours(0, 0, 0, 0)
+  const fin = minuit()
 
   const debut = new Date(fin)
   if (jours === null) {
     if (cles.length === 0) return []
-    debut.setTime(new Date(cles[0]).getTime())
+    // La clé est déjà une date locale : on la relit comme telle, pas en UTC.
+    const [a, m, j] = cles[0].split('-').map(Number)
+    debut.setFullYear(a, m - 1, j)
   } else {
     debut.setDate(debut.getDate() - (jours - 1))
   }
 
   const serie: Jour[] = []
   for (const d = new Date(debut); d <= fin; d.setDate(d.getDate() + 1)) {
-    const cle = d.toISOString().slice(0, 10)
+    const cle = cleJour(d)
     serie.push({ jour: cle, ...(parJour.get(cle) ?? { ventes: 0, encaisse: 0 }) })
   }
   return serie
+}
+
+/** La clé du jour en cours, celle que porte la dernière colonne du graphique. */
+export const cleAujourdHui = () => cleJour(new Date())
+
+/**
+ * La journée en cours : ce qui a été encaissé depuis minuit.
+ *
+ * Calculée par la série elle-même plutôt qu'à côté : le chiffre affiché sur
+ * l'accueil est alors, par construction, celui de la dernière colonne du
+ * graphique et de la dernière ligne du tableau. Deux calculs parallèles
+ * finiraient par diverger d'une vente, et c'est le genre d'écart qui fait
+ * douter de tout le reste.
+ */
+export function duJour(orders: Order[]): Agregat {
+  const serie = serieQuotidienne(orders, 1)
+  return serie[serie.length - 1] ?? { ventes: 0, encaisse: 0 }
 }
 
 /** Le classement des moyens de paiement : usage réel et échecs, côte à côte. */
