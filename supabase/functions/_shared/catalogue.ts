@@ -26,11 +26,42 @@ import {
 // Vocabulaire commun
 // ============================================================
 
+/**
+ * Codes pays à deux lettres (SebPay, SasPay) vers trois lettres (les nôtres).
+ *
+ * Cette table décide ce que la boutique peut vendre : un pays qui n'y figure
+ * pas est écarté des catalogues SebPay et SasPay, et ne survit que si pawaPay
+ * le sert — lui fournit déjà des codes à trois lettres. Le Gabon y a manqué
+ * longtemps : il était vendu par pawaPay seul, Moov Gabon n'apparaissait nulle
+ * part, et les deux autres routes d'Airtel Gabon étaient jetées en silence.
+ *
+ * Toute entrée ajoutée ici doit l'être aussi dans INDICATIFS et NOMS_PAYS
+ * ci-dessous, sans quoi le pays s'affiche sans préfixe téléphonique.
+ */
 const ALPHA2_VERS_ALPHA3: Record<string, string> = {
   BJ: 'BEN', BF: 'BFA', CD: 'COD', CG: 'COG', CI: 'CIV', CM: 'CMR',
-  GH: 'GHA', GM: 'GMB', GN: 'GIN', GW: 'GNB', KE: 'KEN', ML: 'MLI',
-  NE: 'NER', NG: 'NGA', SN: 'SEN', TG: 'TGO', TZ: 'TZA', UG: 'UGA',
-  MW: 'MWI', RW: 'RWA', ZM: 'ZMB',
+  GA: 'GAB', GH: 'GHA', GM: 'GMB', GN: 'GIN', GW: 'GNB', KE: 'KEN',
+  ML: 'MLI', NE: 'NER', NG: 'NGA', SN: 'SEN', TG: 'TGO', TZ: 'TZA',
+  UG: 'UGA', MW: 'MWI', RW: 'RWA', ZM: 'ZMB',
+}
+
+/**
+ * Note le pays écarté faute de traduction, une seule fois par démarrage.
+ *
+ * Sans cette trace, un oubli dans la table ci-dessus ne se voit nulle part :
+ * le pays disparaît du catalogue sans erreur, sans log, et la boutique vend
+ * simplement moins qu'elle ne pourrait. C'est exactement comme ça que le
+ * Gabon est passé inaperçu. Une seule ligne par code : ces boucles tournent à
+ * chaque visite de la page de paiement.
+ */
+const paysSignales = new Set<string>()
+
+function signalerPaysInconnu(alpha2: string, nom: string, processeur: string) {
+  if (paysSignales.has(alpha2)) return
+  paysSignales.add(alpha2)
+  console.warn(
+    `catalogue ${processeur}: pays « ${nom} » (${alpha2}) écarté, absent de ALPHA2_VERS_ALPHA3`,
+  )
 }
 
 /**
@@ -331,8 +362,13 @@ function ajouterSebpay(index: Map<string, Methode>, catalogue: CatalogueSebpay) 
     if (!alpha2) continue
 
     const pays = parAlpha2.get(alpha2)
+    if (!pays) continue
+
     const country = ALPHA2_VERS_ALPHA3[alpha2]
-    if (!pays || !country) continue
+    if (!country) {
+      signalerPaysInconnu(alpha2, pays.country_name, 'sebpay')
+      continue
+    }
 
     const devise = (pays.currency as { code?: string })?.code
     if (!devise) continue
@@ -403,7 +439,10 @@ function ajouterSaspay(index: Map<string, Methode>, catalogue: CatalogueSaspay) 
     if (!pays || !pays.is_active || !pays.default_currency) continue
 
     const country = ALPHA2_VERS_ALPHA3[pays.iso_code]
-    if (!country) continue
+    if (!country) {
+      signalerPaysInconnu(pays.iso_code, pays.name, 'saspay')
+      continue
+    }
 
     const method = methodeCanonique(r.code)
     const methode = index.get(`${country}:${method}`)
